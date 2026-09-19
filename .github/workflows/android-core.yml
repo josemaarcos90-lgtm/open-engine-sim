@@ -20,12 +20,12 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          sdkmanager --version
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --version
 
       - name: Instalar NDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "ndk;27.2.12479018"
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
 
       - name: Verificar NDK
         run: |
