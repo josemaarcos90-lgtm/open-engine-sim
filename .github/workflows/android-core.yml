@@ -40,6 +40,7 @@ jobs:
         run: |
           FILE="dependencies/submodules/piranha/include/standard_allocator.h"
 
+          echo "=== Android Piranha allocation compatibility patch ==="
           echo "=== Antes ==="
           grep -n "aligned_alloc" "$FILE" || true
 
