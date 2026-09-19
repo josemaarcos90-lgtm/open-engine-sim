@@ -19,19 +19,40 @@ jobs:
       - name: Preparar ferramentas
         run: |
           sudo apt-get update
-          sudo apt-get install -y flex bison ninja-build
+          sudo apt-get install -y \
+            flex \
+            libfl-dev \
+            bison \
+            ninja-build
+
+          echo "=== FLEX ==="
           flex --version
+
+          echo "=== BISON ==="
           bison --version
+
+          echo "=== FlexLexer.h ==="
+          dpkg -L libfl-dev | grep FlexLexer.h
 
       - name: Verificar Android SDK
         run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --version
 
       - name: Instalar NDK
         run: |
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            --licenses > /dev/null || true
+
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;27.2.12479018"
+
+      - name: Verificar NDK
+        run: |
+          echo "=== NDK ==="
+          ls "$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          echo "NDK pronto."
 
       - name: Configurar Android ARM64 com Scripting
         run: |
@@ -48,14 +69,36 @@ jobs:
             -DENGINE_SIM_BUILD_SCRIPTING=ON \
             -DBUILD_TESTING=OFF
 
+      - name: Compilar Core
+        run: |
+          cmake --build build-android \
+            --target engine-sim-core \
+            --parallel 2
+
+      - name: Compilar Render Support
+        run: |
+          cmake --build build-android \
+            --target engine-sim-render-support \
+            --parallel 2
+
+      - name: Compilar Visualization
+        run: |
+          cmake --build build-android \
+            --target engine-sim-visualization \
+            --parallel 2
+
       - name: Compilar Scripting
         run: |
           cmake --build build-android \
             --target engine-sim-scripting \
             --parallel 2
 
-      - name: Compilar Visualization com Scripting
+      - name: Resultado
         run: |
-          cmake --build build-android \
-            --target engine-sim-visualization \
-            --parallel 2
+          echo "=========================================="
+          echo "ANDROID ARM64 TESTE CONCLUIDO"
+          echo "Core              = OK"
+          echo "Render Support    = OK"
+          echo "Visualization     = OK"
+          echo "Scripting         = OK"
+          echo "=========================================="
