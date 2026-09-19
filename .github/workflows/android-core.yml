@@ -16,17 +16,21 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Configurar Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verificar Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          sdkmanager --version
 
       - name: Instalar NDK
-        run: sdkmanager "ndk;27.2.12479018"
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "ndk;27.2.12479018"
+
+      - name: Verificar NDK
+        run: |
+          ls "$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          echo "NDK pronto."
 
       - name: Configurar CMake para Android ARM64
         run: |
