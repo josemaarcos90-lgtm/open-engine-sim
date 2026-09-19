@@ -25,20 +25,8 @@ jobs:
             bison \
             ninja-build
 
-          echo "=== FLEX ==="
           flex --version
-
-          echo "=== BISON ==="
           bison --version
-
-          echo "=== FlexLexer.h ==="
-          dpkg -L libfl-dev | grep FlexLexer.h
-
-      - name: Verificar Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --version
 
       - name: Instalar NDK
         run: |
@@ -48,11 +36,41 @@ jobs:
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "ndk;27.2.12479018"
 
-      - name: Verificar NDK
+      - name: Corrigir Piranha para Android
         run: |
-          echo "=== NDK ==="
-          ls "$ANDROID_SDK_ROOT/ndk/27.2.12479018"
-          echo "NDK pronto."
+          FILE="dependencies/submodules/piranha/include/standard_allocator.h"
+
+          echo "=== Antes ==="
+          grep -n "aligned_alloc" "$FILE" || true
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("dependencies/submodules/piranha/include/standard_allocator.h")
+          text = path.read_text()
+
+          old = "void *buffer = std::aligned_alloc(alignment, sizeof(t_alloc) * n);"
+
+          new = """void *buffer = nullptr;
+          #if defined(__ANDROID__)
+                          if (posix_memalign(&buffer, alignment, sizeof(t_alloc) * n) != 0) {
+                              buffer = nullptr;
+                          }
+          #else
+                          buffer = std::aligned_alloc(alignment, sizeof(t_alloc) * n);
+          #endif"""
+
+          if old not in text:
+              raise SystemExit(
+                  "ERRO: linha esperada com std::aligned_alloc nao encontrada."
+              )
+
+          path.write_text(text.replace(old, new, 1))
+          print("Patch Android aplicado.")
+          PY
+
+          echo "=== Depois ==="
+          grep -n -A8 -B3 "posix_memalign" "$FILE"
 
       - name: Configurar Android ARM64 com Scripting
         run: |
@@ -95,10 +113,10 @@ jobs:
 
       - name: Resultado
         run: |
-          echo "=========================================="
-          echo "ANDROID ARM64 TESTE CONCLUIDO"
-          echo "Core              = OK"
-          echo "Render Support    = OK"
-          echo "Visualization     = OK"
-          echo "Scripting         = OK"
-          echo "=========================================="
+          echo "========================================"
+          echo "ANDROID ARM64"
+          echo "Core           = OK"
+          echo "Render Support = OK"
+          echo "Visualization  = OK"
+          echo "Scripting      = OK"
+          echo "========================================"
