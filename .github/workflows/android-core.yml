@@ -1,4 +1,4 @@
-name: Android Port Test
+name: Android Scripting Test
 
 on:
   workflow_dispatch:
@@ -16,9 +16,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Preparar ferramentas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison ninja-build
+          flex --version
+          bison --version
+
       - name: Verificar Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --version
 
@@ -27,12 +33,7 @@ jobs:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
 
-      - name: Verificar NDK
-        run: |
-          ls "$ANDROID_SDK_ROOT/ndk/27.2.12479018"
-          echo "NDK pronto."
-
-      - name: Configurar CMake Android ARM64
+      - name: Configurar Android ARM64 com Scripting
         run: |
           cmake \
             -S . \
@@ -44,22 +45,16 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DENGINE_SIM_BUILD_DESKTOP=OFF \
             -DENGINE_SIM_BUILD_WEB=OFF \
-            -DENGINE_SIM_BUILD_SCRIPTING=OFF \
+            -DENGINE_SIM_BUILD_SCRIPTING=ON \
             -DBUILD_TESTING=OFF
 
-      - name: Compilar Core
+      - name: Compilar Scripting
         run: |
           cmake --build build-android \
-            --target engine-sim-core \
+            --target engine-sim-scripting \
             --parallel 2
 
-      - name: Compilar Render Support
-        run: |
-          cmake --build build-android \
-            --target engine-sim-render-support \
-            --parallel 2
-
-      - name: Compilar Visualization
+      - name: Compilar Visualization com Scripting
         run: |
           cmake --build build-android \
             --target engine-sim-visualization \
