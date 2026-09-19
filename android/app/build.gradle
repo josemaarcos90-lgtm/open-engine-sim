@@ -38,7 +38,7 @@ android {
     sourceSets {
         main {
             // Package the existing simulator assets at the APK asset root.
-            assets.srcDirs = ['../../../assets']
+            assets.srcDirs = ['../../assets']
         }
     }
 
