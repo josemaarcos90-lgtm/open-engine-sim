@@ -1,4 +1,4 @@
-name: Android Scripting Test
+name: Android APK Build
 
 on:
   workflow_dispatch:
@@ -23,18 +23,23 @@ jobs:
             flex \
             libfl-dev \
             bison \
-            ninja-build
+            ninja-build \
+            curl \
+            unzip
 
           flex --version
           bison --version
 
-      - name: Instalar NDK
+      - name: Instalar Android SDK, NDK e CMake
         run: |
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             --licenses > /dev/null || true
 
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "ndk;27.2.12479018"
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018" \
+            "cmake;3.31.6"
 
       - name: Corrigir Piranha para Android
         run: |
@@ -112,6 +117,52 @@ jobs:
             --target engine-sim-scripting \
             --parallel 2
 
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Baixar SDL3 Android
+        run: |
+          mkdir -p android/app/libs /tmp/sdl3-android
+          curl --fail --location --retry 3 \
+            "https://github.com/libsdl-org/SDL/releases/download/release-3.2.8/SDL3-devel-3.2.8-android.zip" \
+            --output /tmp/sdl3-android.zip
+          unzip -q /tmp/sdl3-android.zip -d /tmp/sdl3-android
+
+          SDL_AAR="$(find /tmp/sdl3-android -type f -name 'SDL3-3.2.8.aar' -print -quit)"
+          if [ -z "$SDL_AAR" ]; then
+            echo "SDL3-3.2.8.aar nao encontrado no pacote Android."
+            find /tmp/sdl3-android -maxdepth 4 -type f | sort
+            exit 1
+          fi
+
+          cp "$SDL_AAR" android/app/libs/SDL3-3.2.8.aar
+          ls -lh android/app/libs/SDL3-3.2.8.aar
+
+      - name: Montar APK debug ARM64
+        run: |
+          gradle -p android :app:assembleDebug --stacktrace
+
+      - name: Verificar APK
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          ls -lh "$APK"
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-engine-sim-android-arm64-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
       - name: Resultado
         run: |
           echo "========================================"
@@ -120,4 +171,5 @@ jobs:
           echo "Render Support = OK"
           echo "Visualization  = OK"
           echo "Scripting      = OK"
+          echo "APK            = OK"
           echo "========================================"
