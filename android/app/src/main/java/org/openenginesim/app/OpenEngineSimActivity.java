@@ -19,12 +19,12 @@ import java.nio.file.Files;
 
 public class OpenEngineSimActivity extends SDLActivity {
     private static final String TAG = "OpenEngineSim";
-    private static final String ASSET_VERSION = "0.2.2-android-alpha2";
+    private static final String ASSET_VERSION = "0.2.2-android-alpha3";
     private TextView diagnosticView;
+    private String assetStatus = "ASSETS: AINDA NAO VERIFICADOS";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        String assetStatus;
         try {
             syncAssets();
             assetStatus = validateAssets();
@@ -35,12 +35,30 @@ public class OpenEngineSimActivity extends SDLActivity {
         }
 
         super.onCreate(savedInstanceState);
-        showDiagnostics(
-            "OPEN ENGINE SIM - ANDROID DIAGNOSTICO\n\n" +
-            "JAVA/SDL ACTIVITY: OK\n" +
-            assetStatus + "\n\n" +
-            "Se esta tela continuar visivel, envie um print.\n" +
-            "O proximo estagio e a inicializacao nativa/GPU.");
+        updateNativeStatus("Aguardando entrada no codigo C++...");
+    }
+
+    public void updateNativeStatus(final String nativeStatus) {
+        runOnUiThread(() -> {
+            final String message =
+                "OPEN ENGINE SIM - ANDROID DIAGNOSTICO V2\n\n" +
+                "JAVA/SDL ACTIVITY: OK\n" +
+                assetStatus + "\n\n" +
+                "NATIVO/GPU:\n" + nativeStatus;
+
+            if (diagnosticView == null) {
+                diagnosticView = new TextView(this);
+                diagnosticView.setTextColor(Color.GREEN);
+                diagnosticView.setBackgroundColor(Color.BLACK);
+                diagnosticView.setTextSize(16.0f);
+                diagnosticView.setGravity(Gravity.TOP | Gravity.START);
+                diagnosticView.setPadding(32, 48, 32, 32);
+                addContentView(diagnosticView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            diagnosticView.setText(message);
+        });
     }
 
     private String validateAssets() {
@@ -54,21 +72,6 @@ public class OpenEngineSimActivity extends SDLActivity {
             "\nMAIN.MR: " + (mainScript.isFile() ? "OK" : "FALHOU");
     }
 
-    private void showDiagnostics(final String message) {
-        runOnUiThread(() -> {
-            diagnosticView = new TextView(this);
-            diagnosticView.setText(message);
-            diagnosticView.setTextColor(Color.GREEN);
-            diagnosticView.setBackgroundColor(Color.BLACK);
-            diagnosticView.setTextSize(16.0f);
-            diagnosticView.setGravity(Gravity.TOP | Gravity.START);
-            diagnosticView.setPadding(32, 48, 32, 32);
-            addContentView(diagnosticView, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        });
-    }
-
     private void syncAssets() throws IOException {
         final File destinationRoot = new File(getFilesDir(), "assets");
         final File marker = new File(destinationRoot, ".asset-version");
@@ -76,9 +79,7 @@ public class OpenEngineSimActivity extends SDLActivity {
         if (marker.isFile()) {
             final String installedVersion = new String(
                 Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8).trim();
-            if (ASSET_VERSION.equals(installedVersion)) {
-                return;
-            }
+            if (ASSET_VERSION.equals(installedVersion)) return;
         }
 
         deleteRecursively(destinationRoot);
@@ -91,21 +92,15 @@ public class OpenEngineSimActivity extends SDLActivity {
         Log.i(TAG, "Simulator assets extracted to " + destinationRoot);
     }
 
-    private static void copyAssetTree(
-        AssetManager manager,
-        String assetPath,
-        File destination) throws IOException
-    {
+    private static void copyAssetTree(AssetManager manager, String assetPath, File destination)
+        throws IOException {
         final String[] children = manager.list(assetPath);
         if (children != null && children.length > 0) {
             if (!destination.mkdirs() && !destination.isDirectory()) {
                 throw new IOException("Could not create " + destination);
             }
-
             for (String child : children) {
-                final String childAssetPath = assetPath.isEmpty()
-                    ? child
-                    : assetPath + "/" + child;
+                final String childAssetPath = assetPath.isEmpty() ? child : assetPath + "/" + child;
                 copyAssetTree(manager, childAssetPath, new File(destination, child));
             }
             return;
@@ -115,29 +110,18 @@ public class OpenEngineSimActivity extends SDLActivity {
         if (parent != null && !parent.mkdirs() && !parent.isDirectory()) {
             throw new IOException("Could not create " + parent);
         }
-
         try (InputStream input = manager.open(assetPath);
              FileOutputStream output = new FileOutputStream(destination)) {
             final byte[] buffer = new byte[64 * 1024];
             int count;
-            while ((count = input.read(buffer)) != -1) {
-                output.write(buffer, 0, count);
-            }
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
         }
     }
 
     private static void deleteRecursively(File file) throws IOException {
         if (!file.exists()) return;
-
         final File[] children = file.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                deleteRecursively(child);
-            }
-        }
-
-        if (!file.delete()) {
-            throw new IOException("Could not delete " + file);
-        }
+        if (children != null) for (File child : children) deleteRecursively(child);
+        if (!file.delete()) throw new IOException("Could not delete " + file);
     }
 }
