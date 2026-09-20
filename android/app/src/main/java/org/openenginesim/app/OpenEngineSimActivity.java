@@ -1,8 +1,12 @@
 package org.openenginesim.app;
 
 import android.content.res.AssetManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.TextView;
 
 import org.libsdl.app.SDLActivity;
 
@@ -15,18 +19,54 @@ import java.nio.file.Files;
 
 public class OpenEngineSimActivity extends SDLActivity {
     private static final String TAG = "OpenEngineSim";
-    private static final String ASSET_VERSION = "0.2.2-android-alpha1";
+    private static final String ASSET_VERSION = "0.2.2-android-alpha2";
+    private TextView diagnosticView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String assetStatus;
         try {
             syncAssets();
+            assetStatus = validateAssets();
         }
         catch (IOException exception) {
             Log.e(TAG, "Failed to extract simulator assets", exception);
+            assetStatus = "ASSETS: FALHOU\n" + exception;
         }
 
         super.onCreate(savedInstanceState);
+        showDiagnostics(
+            "OPEN ENGINE SIM - ANDROID DIAGNOSTICO\n\n" +
+            "JAVA/SDL ACTIVITY: OK\n" +
+            assetStatus + "\n\n" +
+            "Se esta tela continuar visivel, envie um print.\n" +
+            "O proximo estagio e a inicializacao nativa/GPU.");
+    }
+
+    private String validateAssets() {
+        final File root = new File(getFilesDir(), "assets");
+        final File vertex = new File(root, "shaders/engine_sim.vertex.spv");
+        final File fragment = new File(root, "shaders/engine_sim.fragment.spv");
+        final File mainScript = new File(root, "main.mr");
+        return "ASSETS: " + (root.isDirectory() ? "OK" : "FALHOU") +
+            "\nVERTEX SPV: " + (vertex.isFile() ? "OK" : "FALHOU") +
+            "\nFRAGMENT SPV: " + (fragment.isFile() ? "OK" : "FALHOU") +
+            "\nMAIN.MR: " + (mainScript.isFile() ? "OK" : "FALHOU");
+    }
+
+    private void showDiagnostics(final String message) {
+        runOnUiThread(() -> {
+            diagnosticView = new TextView(this);
+            diagnosticView.setText(message);
+            diagnosticView.setTextColor(Color.GREEN);
+            diagnosticView.setBackgroundColor(Color.BLACK);
+            diagnosticView.setTextSize(16.0f);
+            diagnosticView.setGravity(Gravity.TOP | Gravity.START);
+            diagnosticView.setPadding(32, 48, 32, 32);
+            addContentView(diagnosticView, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        });
     }
 
     private void syncAssets() throws IOException {
