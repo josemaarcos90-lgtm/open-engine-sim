@@ -1,7 +1,7 @@
 #include "../include/desktop_platform_sdl.h"
 #include "../include/engine_sim_application.h"
 #include "../include/sdl_audio_output.h"
-#include "../include/sdl_gpu_renderer.h"
+#include "../include/web_gl_renderer.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -72,25 +72,30 @@ int main(int, char **) {
     RuntimePaths paths;
     paths.applicationDirectory = internalStorage;
     paths.assetDirectory = std::filesystem::path(internalStorage) / "assets";
-    const std::filesystem::path shaderDirectory = paths.assetDirectory / "shaders";
-
-    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: iniciando...");
-    SdlGpuRenderer renderer;
-    if (!renderer.initialize(platform.nativeWindowHandle(), shaderDirectory.string())) {
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 OPENGL ES 3: iniciando...");
+    WebGlRenderer renderer;
+    if (!renderer.initialize(static_cast<SDL_Window *>(platform.nativeWindowHandle()))) {
         const std::string error = renderer.lastError();
-        logError("SDL GPU initialization failed", error.c_str());
-        showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: FALHOU\n\nERRO:\n" + error);
+        logError("OpenGL ES initialization failed", error.c_str());
+        showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 OPENGL ES 3: FALHOU\n\nERRO:\n" + error);
         platform.shutdown();
         return 1;
     }
 
-    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: OK\n5/6 ENGINE SIM: inicializando...");
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 OPENGL ES 3: OK\n5/6 ENGINE SIM: inicializando...");
     EngineSimApplication application;
     SdlAudioOutput audioOutput;
     application.initialize(&platform, &renderer, &audioOutput, paths);
 
-    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: OK\n5/6 ENGINE SIM: OK\n6/6 LOOP: INICIANDO\n\nRemovendo overlay...");
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 OPENGL ES 3: OK\n5/6 ENGINE SIM: OK\n6/6 LOOP: INICIANDO\n\nRemovendo overlay...");
     SDL_Delay(700);
+    if (!application.tick()) {
+        showStatus("ENGINE SIM: loop encerrou antes do primeiro frame");
+        application.destroy();
+        renderer.shutdown();
+        platform.shutdown();
+        return 1;
+    }
     hideDiagnostics();
 
     application.run();
