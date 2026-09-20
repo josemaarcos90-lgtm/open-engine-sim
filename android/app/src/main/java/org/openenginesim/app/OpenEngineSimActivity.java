@@ -217,7 +217,11 @@ public class OpenEngineSimActivity extends SDLActivity {
             diagnosticView.setPadding(32, 48, 32, 32);
             diagnosticView.setVisibility(View.VISIBLE);
             diagnosticView.setText("OPEN ENGINE SIM - MR DIAGNOSTICO TEMPORARIO\n\n" + status +
-                "\n\nO overlay fica aberto para permitir screenshot.");
+                "\n\nO overlay fecha automaticamente apos o checkpoint.");
+            // Diagnostic overlay must never become the app itself. Each new
+            // checkpoint refreshes this timeout; once native code keeps running
+            // normally, reveal the SDL surface again.
+            diagnosticView.postDelayed(hideDiagnosticsRunnable, 2200);
         });
     }
 
