@@ -29,3 +29,22 @@ if(TARGET engine-sim-scripting)
 endif()
 set_property(TARGET ${_engine_sim_android_pic_targets}
     PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# Android is dominated by native simulation/synthesis CPU time. Keep the
+# installable debug APK, but compile every native dependency with production
+# optimization so Gradle's debug variant cannot silently fall back to -O0.
+set(_engine_sim_android_optimized_targets
+    main
+    simple-2d-constraint-solver
+    engine-sim-core
+    engine-sim-render-support
+    engine-sim-visualization)
+if(TARGET piranha)
+    list(APPEND _engine_sim_android_optimized_targets piranha)
+endif()
+if(TARGET engine-sim-scripting)
+    list(APPEND _engine_sim_android_optimized_targets engine-sim-scripting)
+endif()
+foreach(_target IN LISTS _engine_sim_android_optimized_targets)
+    target_compile_options(${_target} PRIVATE -O3 -DNDEBUG)
+endforeach()
