@@ -607,7 +607,15 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
     }
 
     if (loaded) {
+#if defined(__ANDROID__)
+        checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: objetos validos; entrando em loadEngine()");
+#endif
         loadEngine(engine, vehicle, transmission);
+#if defined(__ANDROID__)
+        checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: loadEngine() CONCLUIDO");
+        const std::string mrLogPath = saveAndroidMrLog(mrTrace.str() + "\nRESULTADO: CARREGADO COM SUCESSO\n");
+        showAndroidMrDiagnostics(mrTrace.str() + "\nRESULTADO: CARREGADO COM SUCESSO\nLOG: " + mrLogPath);
+#endif
         return true;
     }
     if (m_infoCluster != nullptr) {
@@ -824,11 +832,17 @@ void EngineSimApplication::refreshUserInterface() {
     m_mixerCluster->setSimulator(m_simulator);
 }
 void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmission *transmission) {
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 1/10 | parando audio antigo");
+#endif
     if (m_audioOutput != nullptr) m_audioOutput->stop();
     // Stop and join the synthesizer worker before destroying the simulator or
     // engine it is reading. Hot-loading while that worker is alive can race
     // destruction and crash on Android.
     if (m_simulator != nullptr) m_simulator->endAudioRenderingThread();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 2/10 | audio antigo parado; destruindo UI/objetos");
+#endif
     destroyObjects();
     m_uiManager.destroy();
     m_engineView = nullptr;
@@ -853,6 +867,9 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     m_clutchPressure = 0.0;
     m_targetClutchPressure = 0.0;
     m_dynoSpeed = 0.0;
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 3/10 | estado antigo destruido; instalando novo engine");
+#endif
     m_iceEngine = engine;
     m_vehicle = vehicle;
     m_transmission = transmission;
@@ -862,7 +879,13 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     const int outputAudioSampleRate = m_audioOutput != nullptr
         ? m_audioOutput->outputSampleRate()
         : 44100;
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 4/10 | criando Simulator");
+#endif
     m_simulator = engine->createSimulator(vehicle, transmission, outputAudioSampleRate);
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 5/10 | Simulator criado; configurando simulacao");
+#endif
     m_viewParameters.Layer1 = engine->getMaxDepth();
     engine->calculateDisplacement();
 #if defined(__ANDROID__)
@@ -885,14 +908,29 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     m_simulator->setTargetSynthesizerLatency(0.1);
     m_simulator->setSynthesizerLatencyCorrectionEnabled(false);
     m_simulator->setMaximumSynthesizerInputLatency(0.03);
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 6/10 | simulacao configurada; carregando impulse responses");
+#endif
     for (int i = 0; i < engine->getExhaustSystemCount(); ++i) {
         ImpulseResponse *response = engine->getExhaustSystem(i)->getImpulseResponse();
         if (response != nullptr && m_audioOutput != nullptr) {
             m_audioOutput->loadImpulseResponse(m_simulator->synthesizer(), response->getFilename(), response->getVolume(), i);
         }
     }
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 7/10 | impulse responses OK; iniciando thread de audio");
+#endif
     m_simulator->startAudioRenderingThread();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 8/10 | thread de audio OK; iniciando saida SDL");
+#endif
     if (m_audioOutput != nullptr) m_audioOutput->start(m_simulator);
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 9/10 | audio SDL OK; criando objetos visuais");
+#endif
     createObjects(engine);
     refreshUserInterface();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE 10/10 | UI pronta");
+#endif
 }
