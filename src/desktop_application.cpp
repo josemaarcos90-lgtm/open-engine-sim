@@ -239,11 +239,25 @@ bool EngineSimApplication::tick() {
     m_screenHeight = m_platform->windowHeight();
 
     if (dt > 0.0f) {
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0) {
+            ++m_postLoadTickNumber;
+            checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | antes input");
+        }
+#endif
         processEngineInput(dt);
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0 && (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0))
+            checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | input OK");
+#endif
 #if defined(__ANDROID__)
         const std::uint64_t processStart = m_platform->ticks();
 #endif
         if (!m_paused || m_platform->wasKeyPressed(DesktopKey::Right)) process(dt);
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0 && (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0))
+            checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | process OK");
+#endif
 #if defined(__ANDROID__)
         m_lastProcessMs = static_cast<float>(m_platform->ticks() - processStart);
 #endif
@@ -302,10 +316,14 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
     if (m_postLoadProbeTicks > 0) {
         --m_postLoadProbeTicks;
-        if (m_postLoadFirstProcessDone && m_postLoadFirstRenderDone) {
-            checkpointAndroidMr("POST LOAD | PRIMEIRO PROCESS + RENDER OK");
+        if (m_postLoadFirstProcessDone && m_postLoadFirstRenderDone &&
+            (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0)) {
+            checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) +
+                " | process + render continuam OK");
+        }
+        if (m_postLoadProbeTicks == 0) {
+            checkpointAndroidMr("POST LOAD WINDOW | 300 ticks estaveis");
             hideAndroidMrDiagnostics();
-            m_postLoadProbeTicks = 0;
         }
     }
         if (m_infoCluster != nullptr && now < m_mrDiagnosticUntilTick && !m_mrDiagnosticMessage.empty()) {
@@ -669,7 +687,8 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
 #endif
         loadEngine(engine, vehicle, transmission);
 #if defined(__ANDROID__)
-        m_postLoadProbeTicks = 120;
+        m_postLoadProbeTicks = 300;
+        m_postLoadTickNumber = 0;
         m_postLoadFirstProcessDone = false;
         m_postLoadFirstRenderDone = false;
         checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: loadEngine() CONCLUIDO; iniciando probe pos-load");
