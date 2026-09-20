@@ -149,6 +149,25 @@ public class OpenEngineSimActivity extends SDLActivity {
         if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
     };
 
+    public void showMrDiagnostics(final String status) {
+        runOnUiThread(() -> {
+            if (diagnosticView == null) {
+                diagnosticView = new TextView(this);
+                addContentView(diagnosticView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            diagnosticView.removeCallbacks(hideDiagnosticsRunnable);
+            diagnosticView.setBackgroundColor(Color.BLACK);
+            diagnosticView.setTextColor(Color.GREEN);
+            diagnosticView.setTextSize(15.0f);
+            diagnosticView.setGravity(Gravity.TOP | Gravity.START);
+            diagnosticView.setPadding(32, 48, 32, 32);
+            diagnosticView.setVisibility(View.VISIBLE);
+            diagnosticView.setText("OPEN ENGINE SIM - MR DIAGNOSTICO TEMPORARIO\n\n" + status +
+                "\n\nO overlay fica aberto para permitir screenshot.");
+        });
+    }
+
     public void hideNativeDiagnostics() {
         runOnUiThread(() -> {
             if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
