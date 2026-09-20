@@ -237,6 +237,11 @@ void WebGlRenderer::endFrame() {
             m_vertexCapacityBytes = std::max(vertexBytes, m_vertexCapacityBytes * 2);
             glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_vertexCapacityBytes), nullptr, GL_STREAM_DRAW);
         }
+#if defined(__ANDROID__)
+        // Orphan the active range before uploading. This prevents the CPU from
+        // waiting for the previous frame's GPU read of the same streaming VBO.
+        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_vertexCapacityBytes), nullptr, GL_STREAM_DRAW);
+#endif
         glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(vertexBytes), m_vertices);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
         const std::size_t indexBytes = sizeof(std::uint16_t) * static_cast<std::size_t>(m_indexCount);
@@ -244,6 +249,9 @@ void WebGlRenderer::endFrame() {
             m_indexCapacityBytes = std::max(indexBytes, m_indexCapacityBytes * 2);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_indexCapacityBytes), nullptr, GL_STREAM_DRAW);
         }
+#if defined(__ANDROID__)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_indexCapacityBytes), nullptr, GL_STREAM_DRAW);
+#endif
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(indexBytes), m_indices);
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
