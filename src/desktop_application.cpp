@@ -1009,9 +1009,10 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     checkpointAndroidMr("LOAD ENGINE | 03 old scene objects destroyed");
 #endif
 
-    m_uiManager.destroy();
+    // refreshUserInterface() below owns the UI teardown/rebuild. Keeping a
+    // single lifecycle boundary avoids double-destroying reusable UI hosts.
 #if defined(__ANDROID__)
-    checkpointAndroidMr("LOAD ENGINE | 04 old UI destroyed");
+    checkpointAndroidMr("LOAD ENGINE | 04 UI teardown deferred to refresh");
 #endif
 
     m_engineView = nullptr;
