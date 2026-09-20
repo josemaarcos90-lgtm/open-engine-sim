@@ -98,6 +98,21 @@ std::string saveAndroidMrLog(const std::string &message) {
     if (cls) env->DeleteLocalRef(cls);
     return result;
 }
+
+void checkpointAndroidMr(const std::string &message) {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "checkpointMrLog", "(Ljava/lang/String;)V") : nullptr;
+    if (method) {
+        jstring text = env->NewStringUTF(message.c_str());
+        env->CallVoidMethod(activity, method, text);
+        env->DeleteLocalRef(text);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+}
 #endif
 
 // Compose the engine below the camera origin independently of user pan state.
@@ -503,6 +518,7 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         compiler.initialize(m_assetPath);
 #if defined(__ANDROID__)
         mrTrace << "COMPILANDO: " << entryPoint.string() << "\n";
+        checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: entrando em compiler.compile()");
 #endif
         const bool compiled = compiler.compile(entryPoint.string());
 #if defined(__ANDROID__)
@@ -513,12 +529,18 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         }
 #endif
         if (compiled) {
+#if defined(__ANDROID__)
+            checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: compile OK; entrando em compiler.execute()");
+#endif
             const es_script::Compiler::Output output = compiler.execute();
 #if defined(__ANDROID__)
             mrTrace << "execute(): CONCLUIDO\n";
             mrTrace << "ENGINE: " << (output.engine ? "OK" : "NULL") << "\n";
             mrTrace << "VEHICLE: " << (output.vehicle ? "OK" : "NULL") << "\n";
             mrTrace << "TRANSMISSION: " << (output.transmission ? "OK" : "NULL") << "\n";
+#endif
+#if defined(__ANDROID__)
+            checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: execute retornou; validando objetos");
 #endif
             if (output.engine != nullptr) {
                 configure(output.applicationSettings);
