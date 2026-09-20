@@ -7,7 +7,9 @@
 #include <SDL3/SDL_main.h>
 
 #include <android/log.h>
+#include <jni.h>
 #include <filesystem>
+#include <string>
 
 namespace {
 constexpr const char *LogTag = "OpenEngineSim";
@@ -19,59 +21,79 @@ void logInfo(const char *message) {
 void logError(const char *stage, const char *error) {
     __android_log_print(ANDROID_LOG_ERROR, LogTag, "%s: %s", stage, error != nullptr ? error : "(no error)");
 }
+
+void showStatus(const std::string &message) {
+    logInfo(message.c_str());
+
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (env == nullptr || activity == nullptr) return;
+
+    jclass activityClass = env->GetObjectClass(activity);
+    if (activityClass == nullptr) return;
+
+    jmethodID method = env->GetMethodID(
+        activityClass, "updateNativeStatus", "(Ljava/lang/String;)V");
+    if (method != nullptr) {
+        jstring text = env->NewStringUTF(message.c_str());
+        env->CallVoidMethod(activity, method, text);
+        env->DeleteLocalRef(text);
+    }
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+    env->DeleteLocalRef(activityClass);
+}
 }
 
 int main(int, char **) {
-    logInfo("Android native entry point reached");
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL: iniciando...");
 
     DesktopPlatformSdl platform;
-    logInfo("Initializing SDL video/audio");
     if (!platform.initialize("Open Engine Simulator", 1280, 720)) {
-        logError("SDL initialization failed", platform.lastError().c_str());
+        const std::string error = platform.lastError();
+        logError("SDL initialization failed", error.c_str());
+        showStatus("1/6 C++ MAIN: OK\n2/6 SDL: FALHOU\n" + error);
         return 1;
     }
-    logInfo("SDL window created");
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: verificando...");
 
     const char *internalStorage = SDL_GetAndroidInternalStoragePath();
     if (internalStorage == nullptr) {
-        logError("Android storage path unavailable", SDL_GetError());
+        const std::string error = SDL_GetError();
+        logError("Android storage path unavailable", error.c_str());
+        showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: FALHOU\n" + error);
         platform.shutdown();
         return 1;
     }
-    __android_log_print(ANDROID_LOG_INFO, LogTag, "Internal storage: %s", internalStorage);
 
     RuntimePaths paths;
     paths.applicationDirectory = internalStorage;
     paths.assetDirectory = std::filesystem::path(internalStorage) / "assets";
-
     const std::filesystem::path shaderDirectory = paths.assetDirectory / "shaders";
-    const std::filesystem::path vertexShader = shaderDirectory / "engine_sim.vertex.spv";
-    const std::filesystem::path fragmentShader = shaderDirectory / "engine_sim.fragment.spv";
-    __android_log_print(ANDROID_LOG_INFO, LogTag, "Assets: %s", paths.assetDirectory.string().c_str());
-    __android_log_print(ANDROID_LOG_INFO, LogTag, "SPIR-V vertex exists=%d fragment exists=%d",
-        std::filesystem::exists(vertexShader) ? 1 : 0,
-        std::filesystem::exists(fragmentShader) ? 1 : 0);
+
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: iniciando...");
 
     SdlGpuRenderer renderer;
-    logInfo("Initializing SDL GPU renderer");
     if (!renderer.initialize(platform.nativeWindowHandle(), shaderDirectory.string())) {
-        logError("SDL GPU initialization failed", renderer.lastError());
+        const std::string error = renderer.lastError();
+        logError("SDL GPU initialization failed", error.c_str());
+        showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: FALHOU\n\nERRO:\n" + error);
         platform.shutdown();
         return 1;
     }
-    logInfo("SDL GPU renderer initialized");
+
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: OK\n5/6 ENGINE SIM: inicializando...");
 
     EngineSimApplication application;
     SdlAudioOutput audioOutput;
-    logInfo("Initializing EngineSimApplication");
     application.initialize(&platform, &renderer, &audioOutput, paths);
-    logInfo("EngineSimApplication initialized; entering run loop");
-    application.run();
-    logInfo("EngineSimApplication run loop exited");
-    application.destroy();
 
+    showStatus("1/6 C++ MAIN: OK\n2/6 SDL + JANELA: OK\n3/6 STORAGE: OK\n4/6 SDL GPU: OK\n5/6 ENGINE SIM: OK\n6/6 LOOP: INICIANDO");
+
+    application.run();
+    application.destroy();
     renderer.shutdown();
     platform.shutdown();
-    logInfo("Clean shutdown");
     return 0;
 }
