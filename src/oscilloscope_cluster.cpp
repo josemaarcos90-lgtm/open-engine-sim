@@ -310,16 +310,19 @@ void OscilloscopeCluster::sample() {
     Engine *engine = m_simulator->getEngine();
     if (engine == nullptr) return;
 
-    const double cylinderPressure = engine->getChamber(0)->m_system.pressure()
-        + engine->getChamber(0)->m_system.dynamicPressure(-1.0, 0.0);
-
-    #if defined(__ANDROID__)
-    // The scopes are visual telemetry only. Sampling every simulation step creates
-    // a large amount of geometry and CPU work without improving the phone display.
-    constexpr int scopeSampleStride = 8;
+#if defined(__ANDROID__)
+    // Telemetry used to execute expensive pressure/flow queries on EVERY physics
+    // iteration even when no point was stored. At 10 kHz this steals a large
+    // fraction of a mobile CPU core. Exit before doing any scope work.
+    constexpr int scopeSampleStride = 32;
+    if (m_simulator->getCurrentIteration() % scopeSampleStride != 0) return;
 #else
     constexpr int scopeSampleStride = 2;
 #endif
+
+    const double cylinderPressure = engine->getChamber(0)->m_system.pressure()
+        + engine->getChamber(0)->m_system.dynamicPressure(-1.0, 0.0);
+
     if (m_simulator->getCurrentIteration() % scopeSampleStride == 0) {
         double cycleAngle = engine->getCrankshaft(0)->getCycleAngle();
         if (!engine->isSpinningCw()) {
