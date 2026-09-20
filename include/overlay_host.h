@@ -29,6 +29,7 @@ private:
     UiButton *m_closeButton = nullptr;
     UiButton *m_githubButton = nullptr;
     UiButton *m_issuesButton = nullptr;
+    UiButton *m_importEngineButton = nullptr;
     UiButton *m_pickerScrollUpButton = nullptr;
     UiButton *m_pickerScrollDownButton = nullptr;
     std::vector<UiButton *> m_engineButtons;
