@@ -31,12 +31,12 @@ bool DesktopPlatformSdl::initialize(const std::string &title, int width, int hei
 #if defined(__ANDROID__)
     windowFlags |= SDL_WINDOW_FULLSCREEN;
 #endif
-#if defined(__EMSCRIPTEN__)
-    // SDL maps this context to WebGL 2. Native desktop builds keep their SDL
-    // GPU presentation path and therefore do not request an OpenGL context.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    // Emscripten maps this to WebGL 2; Android gets native OpenGL ES 3.
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     windowFlags |= SDL_WINDOW_OPENGL;
 #endif
     m_window = SDL_CreateWindow(title.c_str(), width, height, windowFlags);
