@@ -33,6 +33,7 @@ public class OpenEngineSimActivity extends SDLActivity {
     private static final int ENGINE_FILE_REQUEST = 4107;
     private static final String ASSET_VERSION = "0.2.2-android-alpha39";
     private TextView diagnosticView;
+    private TextView portCreditView;
     private String assetStatus = "ASSETS: AINDA NAO VERIFICADOS";
     private volatile String pendingEngineScript = "";
 
@@ -51,12 +52,31 @@ public class OpenEngineSimActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
         publishPendingNativeCrash();
         updateNativeStatus("Aguardando entrada no codigo C++...");
+        showPortCredit();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+    }
+
+    private void showPortCredit() {
+        runOnUiThread(() -> {
+            if (portCreditView == null) {
+                portCreditView = new TextView(this);
+                portCreditView.setText("Port by M2RCOS");
+                portCreditView.setTextColor(Color.WHITE);
+                portCreditView.setTextSize(14.0f);
+                portCreditView.setGravity(Gravity.BOTTOM | Gravity.START);
+                portCreditView.setPadding(24, 16, 24, 18);
+                portCreditView.setShadowLayer(3.0f, 1.0f, 1.0f, Color.BLACK);
+                addContentView(portCreditView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            portCreditView.bringToFront();
+            portCreditView.setVisibility(View.VISIBLE);
+        });
     }
 
     public void openEngineFilePicker() {
@@ -153,6 +173,7 @@ public class OpenEngineSimActivity extends SDLActivity {
 
     private final Runnable hideDiagnosticsRunnable = () -> {
         if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
+        if (portCreditView != null) portCreditView.setVisibility(View.GONE);
     };
 
     private void publishPendingNativeCrash() {
@@ -242,6 +263,7 @@ public class OpenEngineSimActivity extends SDLActivity {
     public void hideNativeDiagnostics() {
         runOnUiThread(() -> {
             if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
+            if (portCreditView != null) portCreditView.setVisibility(View.GONE);
         });
     }
 
