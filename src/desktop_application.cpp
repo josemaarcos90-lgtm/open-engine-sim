@@ -197,7 +197,9 @@ bool EngineSimApplication::tick() {
             m_pendingScriptPath = importedScript;
             m_externalEnginePickerPending = false;
             if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);
-            m_mrDiagnosticUntilTick = now + 15000;
+            #if defined(__ANDROID__)
+        m_mrDiagnosticUntilTick = now + 15000;
+#endif
         }
     }
 #endif
@@ -205,11 +207,15 @@ bool EngineSimApplication::tick() {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
         if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);
+        #if defined(__ANDROID__)
         m_mrDiagnosticUntilTick = now + 15000;
+#endif
         if (loadScript(selectedScript)) {
             m_currentScriptPath = selectedScript;
             if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);
-            m_mrDiagnosticUntilTick = now + 15000;
+            #if defined(__ANDROID__)
+        m_mrDiagnosticUntilTick = now + 15000;
+#endif
         }
     }
     // Rendering is substantially more expensive than the audio-producing
