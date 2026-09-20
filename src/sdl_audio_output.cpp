@@ -65,11 +65,22 @@ void SdlAudioOutput::audioThread() {
 
 void SdlAudioOutput::fillStream() {
     if (m_stream == nullptr || m_simulator == nullptr) return;
+    #if defined(__ANDROID__)
+    constexpr int chunkFrames = 1024;
+#else
     constexpr int chunkFrames = 512;
+#endif
     // Keep a small, stable device lead. Larger queues hide underruns but make
     // controls feel disconnected and turn a single discontinuity into a
     // conspicuous delayed clack.
+    #if defined(__ANDROID__)
+    // Android's scheduler can pause the producer for several milliseconds
+    // while the simulation/render threads are busy. Keep ~93 ms queued so a
+    // scheduling spike does not become an audible underrun.
+    constexpr int targetFrames = 4096;
+#else
     constexpr int targetFrames = 1024;
+#endif
     constexpr int targetBytes = targetFrames * static_cast<int>(sizeof(std::int16_t));
     int queuedBytes = SDL_GetAudioStreamQueued(m_stream);
     if (queuedBytes < 0) return;
