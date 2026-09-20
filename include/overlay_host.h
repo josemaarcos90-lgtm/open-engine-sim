@@ -15,6 +15,7 @@ public:
     };
 
     void initialize(EngineSimApplication *app) override;
+    void destroy() override;
     void update(float dt) override;
     void render() override;
     void signal(UiElement *element, Event event) override;
