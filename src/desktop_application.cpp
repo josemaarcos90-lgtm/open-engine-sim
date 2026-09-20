@@ -61,6 +61,21 @@ std::string consumeAndroidEngineSelection() {
     if (cls) env->DeleteLocalRef(cls);
     return result;
 }
+
+void showAndroidMrDiagnostics(const std::string &message) {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "showMrDiagnostics", "(Ljava/lang/String;)V") : nullptr;
+    if (method) {
+        jstring text = env->NewStringUTF(message.c_str());
+        env->CallVoidMethod(activity, method, text);
+        env->DeleteLocalRef(text);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+}
 #endif
 
 // Compose the engine below the camera origin independently of user pan state.
@@ -451,12 +466,34 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
     //  2) engine modules that only define public node main (catalog style).
     // Try the file exactly as authored first. If it does not produce the three
     // simulator objects, fall back to the catalog wrapper used by packaged engines.
+#if defined(__ANDROID__)
+    std::ostringstream mrTrace;
+    mrTrace << "ARQUIVO: " << relativeScriptPath << "\n";
+    mrTrace << "CAMINHO: " << scriptPath.string() << "\n";
+    mrTrace << "EXISTE: " << (std::filesystem::exists(scriptPath) ? "SIM" : "NAO") << "\n";
+    std::error_code mrSizeError;
+    const auto mrSize = std::filesystem::file_size(scriptPath, mrSizeError);
+    mrTrace << "TAMANHO: " << (mrSizeError ? 0 : mrSize) << " bytes\n\n";
+#endif
+
     auto compileEntry = [&](const std::filesystem::path &entryPoint) -> bool {
         es_script::Compiler compiler;
         compiler.initialize(m_assetPath);
+#if defined(__ANDROID__)
+        mrTrace << "COMPILANDO: " << entryPoint.string() << "\n";
+#endif
         const bool compiled = compiler.compile(entryPoint.string());
+#if defined(__ANDROID__)
+        mrTrace << "compile(): " << (compiled ? "OK" : "FALHOU") << "\n";
+#endif
         if (compiled) {
             const es_script::Compiler::Output output = compiler.execute();
+#if defined(__ANDROID__)
+            mrTrace << "execute(): CONCLUIDO\n";
+            mrTrace << "ENGINE: " << (output.engine ? "OK" : "NULL") << "\n";
+            mrTrace << "VEHICLE: " << (output.vehicle ? "OK" : "NULL") << "\n";
+            mrTrace << "TRANSMISSION: " << (output.transmission ? "OK" : "NULL") << "\n";
+#endif
             if (output.engine != nullptr) {
                 configure(output.applicationSettings);
                 engine = output.engine;
@@ -539,6 +576,10 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
             }
         }
 #if defined(__ANDROID__)
+        mrTrace << "\nRESULTADO: FALHOU\n";
+        mrTrace << "MENSAGEM: " << detail << "\n";
+        mrTrace << "\nSe compile() falhou, o proximo passo e capturar o erro interno do Piranha.";
+        showAndroidMrDiagnostics(mrTrace.str());
         m_mrDiagnosticMessage = "MR ERROR | " + detail;
         m_mrDiagnosticUntilTick = m_platform != nullptr ? m_platform->ticks() + 30000 : 30000;
         m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
