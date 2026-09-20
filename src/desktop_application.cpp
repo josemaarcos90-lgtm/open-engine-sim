@@ -289,7 +289,14 @@ bool EngineSimApplication::tick() {
         m_lastRenderTick = now;
     }
 #if defined(__ANDROID__)
-    if (m_infoCluster != nullptr && now < m_mrDiagnosticUntilTick && !m_mrDiagnosticMessage.empty()) {
+    if (m_postLoadProbeTicks > 0) {
+        --m_postLoadProbeTicks;
+        if (m_postLoadFirstProcessDone && m_postLoadFirstRenderDone) {
+            checkpointAndroidMr("POST LOAD | PRIMEIRO PROCESS + RENDER OK");
+            m_postLoadProbeTicks = 0;
+        }
+    }
+        if (m_infoCluster != nullptr && now < m_mrDiagnosticUntilTick && !m_mrDiagnosticMessage.empty()) {
         m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
     }
     if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000 && !m_externalEnginePickerPending && m_pendingScriptPath.empty() && now >= m_mrDiagnosticUntilTick) {
@@ -331,11 +338,27 @@ void EngineSimApplication::destroy() {
 
 void EngineSimApplication::process(float dt) {
     if (m_simulator == nullptr) return;
+#if defined(__ANDROID__)
+    const bool probe = m_postLoadProbeTicks > 0 && !m_postLoadFirstProcessDone;
+    if (probe) checkpointAndroidMr("POST LOAD | PROCESS 01 entrando startFrame");
+#endif
     m_simulator->startFrame(dt);
+#if defined(__ANDROID__)
+    if (probe) checkpointAndroidMr("POST LOAD | PROCESS 02 startFrame OK; entrando simulateStep");
+#endif
     while (m_simulator->simulateStep()) {
         if (m_oscCluster != nullptr) m_oscCluster->sample();
     }
+#if defined(__ANDROID__)
+    if (probe) checkpointAndroidMr("POST LOAD | PROCESS 03 simulateStep OK; entrando endFrame");
+#endif
     m_simulator->endFrame();
+#if defined(__ANDROID__)
+    if (probe) {
+        checkpointAndroidMr("POST LOAD | PROCESS 04 primeiro ciclo de simulacao OK");
+        m_postLoadFirstProcessDone = true;
+    }
+#endif
 }
 
 void EngineSimApplication::render() {
@@ -348,7 +371,14 @@ void EngineSimApplication::render() {
 }
 
 void EngineSimApplication::renderScene() {
+#if defined(__ANDROID__)
+    const bool probe = m_postLoadProbeTicks > 0 && !m_postLoadFirstRenderDone;
+    if (probe) checkpointAndroidMr("POST LOAD | RENDER 01 entrando beginFrame");
+#endif
     m_renderer->beginFrame(m_shadow);
+#if defined(__ANDROID__)
+    if (probe) checkpointAndroidMr("POST LOAD | RENDER 02 beginFrame OK; gerando geometria/UI");
+#endif
     m_geometryGenerator.reset();
     if (m_engineView != nullptr) {
         const Bounds windowBounds(static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight),
@@ -414,9 +444,21 @@ void EngineSimApplication::renderScene() {
             m_engineView->m_bounds.height());
         render();
     }
+#if defined(__ANDROID__)
+    if (probe) checkpointAndroidMr("POST LOAD | RENDER 03 geometria/UI OK; enviando GPU");
+#endif
     m_renderer->uploadGeometry(m_geometryGenerator.getVertexData(), m_geometryGenerator.getCurrentVertexCount(),
         m_geometryGenerator.getIndexData(), m_geometryGenerator.getCurrentIndexCount());
+#if defined(__ANDROID__)
+    if (probe) checkpointAndroidMr("POST LOAD | RENDER 04 uploadGeometry OK; entrando endFrame");
+#endif
     m_renderer->endFrame();
+#if defined(__ANDROID__)
+    if (probe) {
+        checkpointAndroidMr("POST LOAD | RENDER 05 primeiro frame OK");
+        m_postLoadFirstRenderDone = true;
+    }
+#endif
 }
 
 void EngineSimApplication::drawGenerated(const GeometryGenerator::GeometryIndices &indices, int layer) {
@@ -615,7 +657,10 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
 #endif
         loadEngine(engine, vehicle, transmission);
 #if defined(__ANDROID__)
-        checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: loadEngine() CONCLUIDO; aguardando primeiro frame seguro");
+        m_postLoadProbeTicks = 120;
+        m_postLoadFirstProcessDone = false;
+        m_postLoadFirstRenderDone = false;
+        checkpointAndroidMr(mrTrace.str() + "\nCHECKPOINT: loadEngine() CONCLUIDO; iniciando probe pos-load");
         const std::string mrLogPath = saveAndroidMrLog(mrTrace.str() + "\nLOAD ENGINE: CONCLUIDO\n");
         showAndroidMrDiagnostics(mrTrace.str() + "\nLOAD ENGINE: CONCLUIDO\nLOG: " + mrLogPath);
 #endif
