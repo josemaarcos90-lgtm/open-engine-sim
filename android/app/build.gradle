@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 35
-        versionName '0.2.2-android-alpha38-render-trace'
+        versionCode 36
+        versionName '0.2.2-android-alpha39-hotload-hardening'
 
         ndk {
             abiFilters 'arm64-v8a'
