@@ -22,8 +22,11 @@ es_script::Compiler::Output *es_script::Compiler::output() {
 void es_script::Compiler::resetOutput() {
     // Output is process-global because script nodes publish into it. Never let
     // a new compile inherit pointers from the previously loaded engine.
-    // Ownership of published engine/vehicle/transmission is transferred to the
-    // application, so only reset the container here.
+    // Ownership of published engine/vehicle/transmission/functions is
+    // transferred to the application. The Output object itself owns none of
+    // those raw pointers, so deleting only the container is safe and prevents
+    // one container leak per script compile.
+    delete s_output;
     s_output = new Output;
 }
 
