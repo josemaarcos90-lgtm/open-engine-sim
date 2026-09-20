@@ -454,11 +454,11 @@ int16_t Synthesizer::renderAudio(int inputSample, const AudioParameters &paramet
         const float f = f_in - f_dc;
         const float f_p = m_filters[i].derivative.f(f_in);
 
-#if defined(__EMSCRIPTEN__)
+// rand() may serialize through libc's global RNG and is called at audio rate.
+        // The synthesizer already owns an independent xorshift state, so use it
+        // on every platform. This preserves the intended white-noise component
+        // without contending with other threads.
         const float noise = audioRandom(m_audioNoiseState);
-#else
-        const float noise = 2.0 * ((double)rand() / RAND_MAX) - 1.0;
-#endif
         const float r =
             m_filters->airNoiseLowPass.fast_f(noise);
         const float r_mixed =
