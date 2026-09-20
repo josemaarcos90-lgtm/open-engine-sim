@@ -55,6 +55,17 @@ public class OpenEngineSimActivity extends SDLActivity {
         });
     }
 
+    public void showRenderDiagnostics(final String renderStatus) {
+        runOnUiThread(() -> {
+            if (diagnosticView == null) return;
+            diagnosticView.setBackgroundColor(0xCC000000);
+            diagnosticView.setTextColor(Color.GREEN);
+            diagnosticView.setTextSize(15.0f);
+            diagnosticView.setVisibility(View.VISIBLE);
+            diagnosticView.setText("OPEN ENGINE SIM - RENDER DIAGNOSTICO V4\n\n" + renderStatus);
+        });
+    }
+
     public void hideNativeDiagnostics() {
         runOnUiThread(() -> {
             if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
