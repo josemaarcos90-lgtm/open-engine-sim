@@ -98,9 +98,9 @@ bool EngineSimApplication::tick() {
 #if defined(__EMSCRIPTEN__)
     constexpr std::uint64_t renderIntervalMs = 0;
 #elif defined(__ANDROID__)
-    // 30 Hz keeps the dashboard responsive while leaving CPU time for the
-    // high-rate engine/audio simulation.
-    constexpr std::uint64_t renderIntervalMs = 33;
+    // Performance-unlocked Android build. Present whenever the main loop can
+    // produce a frame; the GPU swap is already non-blocking on this path.
+    constexpr std::uint64_t renderIntervalMs = 0;
 #else
     constexpr std::uint64_t renderIntervalMs = 50;
 #endif
