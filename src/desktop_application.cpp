@@ -223,7 +223,7 @@ bool EngineSimApplication::tick() {
         m_lastRenderTick = now;
     }
 #if defined(__ANDROID__)
-    if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000) {
+    if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000 && !m_externalEnginePickerPending && m_pendingScriptPath.empty()) {
         m_lastPerfReportTick = now;
         const int simHz = m_simulator != nullptr
             ? static_cast<int>(m_simulator->getSimulationFrequency()) : 0;
