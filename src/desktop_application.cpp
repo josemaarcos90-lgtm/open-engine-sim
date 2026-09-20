@@ -600,8 +600,8 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // Mobile performance mode. Physics cost scales almost linearly with this
     // frequency (and cylinder count). 2 kHz was audibly coarse in earlier
     // experiments; 6 kHz keeps substantially more temporal resolution while
-    // cutting the default 10 kHz LS workload by 40%.
-    constexpr double AndroidMaxSimulationFrequency = 6000.0;
+    // cutting the default 10 kHz LS workload by 55%. 4.5 kHz is the next quality/performance point after the 6 kHz build still dropped below 20 FPS under throttle.
+    constexpr double AndroidMaxSimulationFrequency = 4500.0;
     m_simulator->setSimulationFrequency(
         std::min(engine->getSimulationFrequency(), AndroidMaxSimulationFrequency));
 #else
