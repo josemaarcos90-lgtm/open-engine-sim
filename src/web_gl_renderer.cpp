@@ -76,6 +76,12 @@ bool WebGlRenderer::initialize(SDL_Window *window) {
         shutdown();
         return false;
     }
+#if defined(__ANDROID__)
+    // Do not let a blocking swap turn a missed 60 Hz refresh into a 30/20/15 Hz
+    // staircase. The application owns its 30 Hz presentation cadence.
+    SDL_GL_SetSwapInterval(0);
+#endif
+    m_submissions.reserve(512);
     glGenVertexArrays(1, &m_vertexArray);
     glGenBuffers(1, &m_vertexBuffer);
     glGenBuffers(1, &m_indexBuffer);
