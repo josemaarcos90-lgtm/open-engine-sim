@@ -397,6 +397,11 @@ void SdlGpuRenderer::endFrame() {
         depthTarget.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
         SDL_GPUColorTargetInfo clearTarget = sceneColorTarget;
         clearTarget.texture = swapchainTexture;
+#ifdef __ANDROID__
+        // Loud diagnostic clear: if this reaches the display, presentation is
+        // healthy and the remaining bug is draw/blit/shader related.
+        clearTarget.clear_color = { 0.85f, 0.05f, 0.65f, 1.0f };
+#endif
         SDL_GPURenderPass *clearPass = SDL_BeginGPURenderPass(commands, &clearTarget, 1, nullptr);
         if (clearPass != nullptr) SDL_EndGPURenderPass(clearPass);
         SDL_GPURenderPass *scenePass = SDL_BeginGPURenderPass(commands, &sceneColorTarget, 1,
@@ -468,7 +473,8 @@ void SdlGpuRenderer::endFrame() {
             "\nSWAPCHAIN: " + std::to_string(swapchainWidth) + " x " + std::to_string(swapchainHeight) +
             "\nSCENE TEXTURE: " + std::string(m_sceneTexture ? "OK" : "NULL") +
             "\nDEPTH TEXTURE: " + std::string(m_depthTexture ? "OK" : "NULL") +
-            "\nSUBMIT GPU: OK";
+            "\nSUBMIT GPU: OK" +
+            "\nTEST CLEAR: MAGENTA";
         screenRenderStatus(status);
     }
 #endif
