@@ -413,9 +413,25 @@ void SdlGpuRenderer::endFrame() {
         if (scenePass != nullptr) SDL_EndGPURenderPass(scenePass);
 
         if (m_sceneTexture != nullptr) {
+            // Engine Sim lays out the dashboard in logical window coordinates,
+            // while SDL_GPU's Android swapchain is in physical pixels. Scale the
+            // scene destination to the real swapchain instead of blitting 1:1.
+            int logicalWidth = 0;
+            int logicalHeight = 0;
+            SDL_GetWindowSize(static_cast<SDL_Window *>(m_window), &logicalWidth, &logicalHeight);
+            const float scaleX = logicalWidth > 0
+                ? static_cast<float>(swapchainWidth) / static_cast<float>(logicalWidth) : 1.0f;
+            const float scaleY = logicalHeight > 0
+                ? static_cast<float>(swapchainHeight) / static_cast<float>(logicalHeight) : 1.0f;
+            const Uint32 dstX = static_cast<Uint32>(std::max(0.0f, m_sceneViewportX * scaleX));
+            const Uint32 dstY = static_cast<Uint32>(std::max(0.0f, m_sceneViewportY * scaleY));
+            const Uint32 dstW = std::min(swapchainWidth - std::min(dstX, swapchainWidth),
+                std::max(1u, static_cast<Uint32>(m_sceneViewportWidth * scaleX)));
+            const Uint32 dstH = std::min(swapchainHeight - std::min(dstY, swapchainHeight),
+                std::max(1u, static_cast<Uint32>(m_sceneViewportHeight * scaleY)));
             const SDL_GPUBlitInfo blitInfo = {
                 { m_sceneTexture, 0, 0, 0, 0, sceneWidth, sceneHeight },
-                { swapchainTexture, 0, 0, static_cast<Uint32>(m_sceneViewportX), static_cast<Uint32>(m_sceneViewportY), sceneWidth, sceneHeight },
+                { swapchainTexture, 0, 0, dstX, dstY, dstW, dstH },
                 SDL_GPU_LOADOP_LOAD, {}, SDL_FLIP_NONE, SDL_GPU_FILTER_LINEAR, false, 0, 0, 0
             };
             SDL_BlitGPUTexture(commands, &blitInfo);
