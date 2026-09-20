@@ -98,11 +98,9 @@ bool EngineSimApplication::tick() {
 #if defined(__EMSCRIPTEN__)
     constexpr std::uint64_t renderIntervalMs = 0;
 #elif defined(__ANDROID__)
-    // Audio-first Android performance test: cap presentation to 20 Hz.
-    // This cuts visual geometry generation/uploads by about one third versus
-    // the previous 30 Hz cadence, leaving more CPU time for simulation and
-    // synthesis without lowering audio quality or simulation frequency.
-    constexpr std::uint64_t renderIntervalMs = 50;
+    // 30 Hz keeps the dashboard responsive while leaving CPU time for the
+    // high-rate engine/audio simulation.
+    constexpr std::uint64_t renderIntervalMs = 33;
 #else
     constexpr std::uint64_t renderIntervalMs = 50;
 #endif
