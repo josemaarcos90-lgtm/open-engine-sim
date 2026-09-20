@@ -449,11 +449,39 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         const bool compiled = compiler.compile(entryPoint.string());
         if (compiled) {
             const es_script::Compiler::Output output = compiler.execute();
-            if (output.engine != nullptr && output.vehicle != nullptr && output.transmission != nullptr) {
+            if (output.engine != nullptr) {
                 configure(output.applicationSettings);
                 engine = output.engine;
                 vehicle = output.vehicle;
                 transmission = output.transmission;
+
+#if defined(__ANDROID__)
+                // Many community .mr files are engine-only modules. Desktop
+                // catalog entries normally provide a vehicle and transmission,
+                // but requiring those objects makes otherwise valid engines
+                // impossible to import on a phone. Supply conservative host
+                // defaults only for the missing pieces.
+                if (vehicle == nullptr) {
+                    vehicle = new Vehicle;
+                    Vehicle::Parameters params{};
+                    params.mass = 1400.0;
+                    params.dragCoefficient = 0.32;
+                    params.crossSectionArea = 2.0;
+                    params.diffRatio = 3.73;
+                    params.tireRadius = 0.31;
+                    params.rollingResistance = 180.0;
+                    vehicle->initialize(params);
+                }
+                if (transmission == nullptr) {
+                    static const double ratios[] = { 3.60, 2.19, 1.41, 1.00, 0.83 };
+                    transmission = new Transmission;
+                    Transmission::Parameters params{};
+                    params.GearCount = 5;
+                    params.GearRatios = ratios;
+                    params.MaxClutchTorque = 680.0;
+                    transmission->initialize(params);
+                }
+#endif
             }
         }
         compiler.destroy();
