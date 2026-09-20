@@ -19,7 +19,16 @@ es_script::Compiler::Output *es_script::Compiler::output() {
     return s_output;
 }
 
+void es_script::Compiler::resetOutput() {
+    // Output is process-global because script nodes publish into it. Never let
+    // a new compile inherit pointers from the previously loaded engine.
+    // Ownership of published engine/vehicle/transmission is transferred to the
+    // application, so only reset the container here.
+    s_output = new Output;
+}
+
 void es_script::Compiler::initialize(const std::string &assetDirectory) {
+    resetOutput();
     m_compiler = new piranha::Compiler(&m_rules);
     m_compiler->setFileExtension(".mr");
     // Engine scripts import both core definitions from assets/es and helper
