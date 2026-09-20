@@ -187,9 +187,16 @@ bool EngineSimApplication::tick() {
     }
     if (m_engineView != nullptr) m_uiManager.update(dt);
 #if defined(__ANDROID__)
-    if (m_pendingScriptPath.empty()) {
+    // JNI polling is only needed while the Android document picker is active.
+    // The previous unconditional poll crossed Java/native boundaries every tick.
+    if (m_externalEnginePickerPending && m_pendingScriptPath.empty()
+        && now - m_lastEnginePickerPollTick >= 100) {
+        m_lastEnginePickerPollTick = now;
         const std::string importedScript = consumeAndroidEngineSelection();
-        if (!importedScript.empty()) m_pendingScriptPath = importedScript;
+        if (!importedScript.empty()) {
+            m_pendingScriptPath = importedScript;
+            m_externalEnginePickerPending = false;
+        }
     }
 #endif
     if (!m_pendingScriptPath.empty()) {
@@ -609,6 +616,8 @@ void EngineSimApplication::showEnginePickerOverlay() { m_uiManager.showEnginePic
 
 void EngineSimApplication::requestExternalEnginePicker() {
 #if defined(__ANDROID__)
+    m_externalEnginePickerPending = true;
+    m_lastEnginePickerPollTick = 0;
     openAndroidEnginePicker();
     if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("Select an engine .mr file");
 #else
