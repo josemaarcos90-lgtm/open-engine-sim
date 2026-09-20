@@ -314,7 +314,7 @@ void OscilloscopeCluster::sample() {
     // Telemetry used to execute expensive pressure/flow queries on EVERY physics
     // iteration even when no point was stored. At 10 kHz this steals a large
     // fraction of a mobile CPU core. Exit before doing any scope work.
-    constexpr int scopeSampleStride = 32;
+    constexpr int scopeSampleStride = 64;
     if (m_simulator->getCurrentIteration() % scopeSampleStride != 0) return;
 #else
     constexpr int scopeSampleStride = 2;
