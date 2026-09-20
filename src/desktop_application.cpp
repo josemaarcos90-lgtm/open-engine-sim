@@ -656,7 +656,7 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // Stop and join the synthesizer worker before destroying the simulator or
     // engine it is reading. Hot-loading while that worker is alive can race
     // destruction and crash on Android.
-    if (m_simulator != nullptr) m_simulator->stopAudioRenderingThread();
+    if (m_simulator != nullptr) m_simulator->endAudioRenderingThread();
     destroyObjects();
     m_uiManager.destroy();
     m_engineView = nullptr;
