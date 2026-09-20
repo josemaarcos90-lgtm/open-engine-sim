@@ -17,6 +17,7 @@
 #include <string>
 
 volatile sig_atomic_t gCrashSubstage = 0;
+volatile sig_atomic_t gCrashDetail = 0;
 
 namespace {
 constexpr const char *LogTag = "OpenEngineSim";
@@ -25,9 +26,11 @@ volatile sig_atomic_t gCrashStage = 0;
 void nativeCrashHandler(int signalNumber) {
     char buffer[256];
     const int length = snprintf(buffer, sizeof(buffer),
-        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\nsubstage=%d\n"
-        "stage 10=main loop; substage 11=input, 12=process, 13=UI, 14=render, 15=idle\n",
-        signalNumber, static_cast<int>(gCrashStage), static_cast<int>(gCrashSubstage));
+        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\nsubstage=%d\ndetail=%d\n"
+        "render detail: 141=generateGeometry, 142=object render, 143=UI render, 144=render done, "
+        "145=beginFrame, 146=layout/reset, 147=render body, 148=uploadGeometry, 149=endFrame\n",
+        signalNumber, static_cast<int>(gCrashStage), static_cast<int>(gCrashSubstage),
+        static_cast<int>(gCrashDetail));
     if (gCrashLogPath[0] != '\0') {
         const int fd = open(gCrashLogPath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
         if (fd >= 0) {
