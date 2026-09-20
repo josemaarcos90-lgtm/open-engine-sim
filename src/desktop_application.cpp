@@ -17,8 +17,9 @@
 #include <fstream>
 
 #if defined(__ANDROID__)
-#include <SDL3/SDL.h>
 #include <jni.h>
+extern "C" void *SDL_GetAndroidJNIEnv(void);
+extern "C" void *SDL_GetAndroidActivity(void);
 #endif
 
 namespace {
