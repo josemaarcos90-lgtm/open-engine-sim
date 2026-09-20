@@ -485,6 +485,10 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         const bool compiled = compiler.compile(entryPoint.string());
 #if defined(__ANDROID__)
         mrTrace << "compile(): " << (compiled ? "OK" : "FALHOU") << "\n";
+        if (!compiled) {
+            const std::string compilerErrors = compiler.getLastErrorText();
+            mrTrace << "ERRO PIRANHA:\n" << (compilerErrors.empty() ? "(sem texto de erro)" : compilerErrors) << "\n";
+        }
 #endif
         if (compiled) {
             const es_script::Compiler::Output output = compiler.execute();
