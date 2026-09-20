@@ -156,6 +156,30 @@ jobs:
           test -f "$APK"
           ls -lh "$APK"
 
+      - name: Coletar simbolos nativos de debug
+        run: |
+          mkdir -p android-native-debug
+          LIBMAIN="$(find android/app/.cxx android/app/build -type f -path '*arm64-v8a*' -name 'libmain.so' -print 2>/dev/null | head -n 1)"
+          if [ -z "$LIBMAIN" ]; then
+            echo "libmain.so nao encontrado para simbolizacao"
+            find android/app/.cxx android/app/build -type f -name '*.so' -print 2>/dev/null || true
+            exit 1
+          fi
+          cp "$LIBMAIN" android-native-debug/libmain.so
+          LLVM_NM="$ANDROID_SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          LLVM_READELF="$ANDROID_SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$LLVM_NM" -n -C android-native-debug/libmain.so > android-native-debug/libmain-symbols.txt
+          "$LLVM_READELF" -n android-native-debug/libmain.so > android-native-debug/build-id.txt
+          file android-native-debug/libmain.so
+          ls -lh android-native-debug/
+
+      - name: Publicar simbolos nativos
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-engine-sim-android-arm64-native-symbols
+          path: android-native-debug/
+          if-no-files-found: error
+
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
