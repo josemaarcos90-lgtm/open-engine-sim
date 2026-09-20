@@ -123,7 +123,13 @@ bool EngineSimApplication::tick() {
 
     if (dt > 0.0f) {
         processEngineInput(dt);
+#if defined(__ANDROID__)
+        const std::uint64_t processStart = m_platform->ticks();
+#endif
         if (!m_paused || m_platform->wasKeyPressed(DesktopKey::Right)) process(dt);
+#if defined(__ANDROID__)
+        m_lastProcessMs = static_cast<float>(m_platform->ticks() - processStart);
+#endif
     }
     if (m_engineView != nullptr) m_uiManager.update(dt);
     if (!m_pendingScriptPath.empty()) {
@@ -135,9 +141,26 @@ bool EngineSimApplication::tick() {
     // simulation on the SDL path. Reserve CPU slices for simulation so
     // the audio stream is never starved by presentation work.
     if (now - m_lastRenderTick >= renderIntervalMs) {
+#if defined(__ANDROID__)
+        const std::uint64_t renderStart = m_platform->ticks();
+#endif
         renderScene();
+#if defined(__ANDROID__)
+        m_lastRenderMs = static_cast<float>(m_platform->ticks() - renderStart);
+#endif
         m_lastRenderTick = now;
     }
+#if defined(__ANDROID__)
+    if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000) {
+        m_lastPerfReportTick = now;
+        const int simHz = m_simulator != nullptr
+            ? static_cast<int>(m_simulator->getSimulationFrequency()) : 0;
+        m_infoCluster->setLogMessage(
+            "ANDROID PERF | SIM " + std::to_string(static_cast<int>(m_lastProcessMs)) +
+            "ms | RENDER " + std::to_string(static_cast<int>(m_lastRenderMs)) +
+            "ms | " + std::to_string(simHz) + "Hz");
+    }
+#endif
     return true;
 }
 
