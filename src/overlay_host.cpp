@@ -74,6 +74,19 @@ private:
 }
 
 void OverlayHost::initialize(EngineSimApplication *app) {
+    // This object is owned by UiManager and is reused across engine hotloads.
+    // Never carry non-owning child pointers from a previous UI generation.
+    m_closeButton = nullptr;
+    m_githubButton = nullptr;
+    m_issuesButton = nullptr;
+    m_importEngineButton = nullptr;
+    m_pickerScrollUpButton = nullptr;
+    m_pickerScrollDownButton = nullptr;
+    m_engineButtons.clear();
+    m_kind = Kind::None;
+    m_pickerScrollOffset = 0.0f;
+    m_pickerMaxScrollOffset = 0.0f;
+
     UiElement::initialize(app);
     m_closeButton = addElement<UiButton>(this);
     m_closeButton->m_text = "CLOSE";
@@ -116,6 +129,22 @@ void OverlayHost::initialize(EngineSimApplication *app) {
         m_engineButtons.push_back(button);
     }
     dismiss();
+}
+
+void OverlayHost::destroy() {
+    // UiElement::destroy() deletes the owned children. Clear every cached raw
+    // pointer afterwards so a later initialize() cannot dereference freed UI.
+    UiElement::destroy();
+    m_closeButton = nullptr;
+    m_githubButton = nullptr;
+    m_issuesButton = nullptr;
+    m_importEngineButton = nullptr;
+    m_pickerScrollUpButton = nullptr;
+    m_pickerScrollDownButton = nullptr;
+    m_engineButtons.clear();
+    m_kind = Kind::None;
+    m_pickerScrollOffset = 0.0f;
+    m_pickerMaxScrollOffset = 0.0f;
 }
 
 Bounds OverlayHost::viewportBounds() const {
