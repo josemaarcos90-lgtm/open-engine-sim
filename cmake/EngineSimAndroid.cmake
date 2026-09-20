@@ -46,6 +46,8 @@ if(TARGET engine-sim-scripting)
     list(APPEND _engine_sim_android_optimized_targets engine-sim-scripting)
 endif()
 foreach(_target IN LISTS _engine_sim_android_optimized_targets)
-    target_compile_options(${_target} PRIVATE -O3 -DNDEBUG -flto)
-    target_link_options(${_target} PRIVATE -flto)
+    # Keep production-like optimization while retaining enough unwind/debug
+    # information to symbolize crashes reproduced on the phone.
+    target_compile_options(${_target} PRIVATE -O3 -DNDEBUG -g -fno-omit-frame-pointer)
+    target_link_options(${_target} PRIVATE -Wl,--build-id=sha1)
 endforeach()
