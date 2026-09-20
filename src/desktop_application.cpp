@@ -2,6 +2,7 @@
 #if defined(__ANDROID__)
 #include <csignal>
 extern volatile sig_atomic_t gCrashSubstage;
+extern volatile sig_atomic_t gCrashDetail;
 #endif
 
 #include "../include/combustion_chamber_object.h"
@@ -438,12 +439,24 @@ void EngineSimApplication::process(float dt) {
 }
 
 void EngineSimApplication::render() {
+#if defined(__ANDROID__)
+    gCrashDetail = 141;
+#endif
     for (SimulationObject *object : m_objects) object->generateGeometry();
+#if defined(__ANDROID__)
+    gCrashDetail = 142;
+#endif
     for (int sublayer = 0; sublayer < 3; ++sublayer) {
         m_viewParameters.Sublayer = sublayer;
         for (SimulationObject *object : m_objects) object->render(&m_viewParameters);
     }
+#if defined(__ANDROID__)
+    gCrashDetail = 143;
+#endif
     if (m_engineView != nullptr) m_uiManager.render();
+#if defined(__ANDROID__)
+    gCrashDetail = 144;
+#endif
 }
 
 void EngineSimApplication::renderScene() {
@@ -451,9 +464,15 @@ void EngineSimApplication::renderScene() {
     const bool probe = m_postLoadProbeTicks > 0 && !m_postLoadFirstRenderDone;
     if (probe) checkpointAndroidMr("POST LOAD | RENDER 01 entrando beginFrame");
 #endif
+#if defined(__ANDROID__)
+    gCrashDetail = 145;
+#endif
     m_renderer->beginFrame(m_shadow);
 #if defined(__ANDROID__)
     if (probe) checkpointAndroidMr("POST LOAD | RENDER 02 beginFrame OK; gerando geometria/UI");
+#endif
+#if defined(__ANDROID__)
+    gCrashDetail = 146;
 #endif
     m_geometryGenerator.reset();
     if (m_engineView != nullptr) {
@@ -518,15 +537,24 @@ void EngineSimApplication::renderScene() {
             static_cast<float>(m_screenHeight) - m_engineView->m_bounds.top(),
             m_engineView->m_bounds.width(),
             m_engineView->m_bounds.height());
+#if defined(__ANDROID__)
+        gCrashDetail = 147;
+#endif
         render();
     }
 #if defined(__ANDROID__)
     if (probe) checkpointAndroidMr("POST LOAD | RENDER 03 geometria/UI OK; enviando GPU");
 #endif
+#if defined(__ANDROID__)
+    gCrashDetail = 148;
+#endif
     m_renderer->uploadGeometry(m_geometryGenerator.getVertexData(), m_geometryGenerator.getCurrentVertexCount(),
         m_geometryGenerator.getIndexData(), m_geometryGenerator.getCurrentIndexCount());
 #if defined(__ANDROID__)
     if (probe) checkpointAndroidMr("POST LOAD | RENDER 04 uploadGeometry OK; entrando endFrame");
+#endif
+#if defined(__ANDROID__)
+    gCrashDetail = 149;
 #endif
     m_renderer->endFrame();
 #if defined(__ANDROID__)
