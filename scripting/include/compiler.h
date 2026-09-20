@@ -31,6 +31,7 @@ namespace es_script {
         ~Compiler();
 
         static Output *output();
+        static void resetOutput();
 
         void initialize(const std::string &assetDirectory);
         bool compile(const piranha::IrPath &path);
