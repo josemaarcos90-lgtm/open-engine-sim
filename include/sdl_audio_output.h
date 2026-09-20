@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 
 class SdlAudioOutput final : public AudioOutput {
 public:
@@ -19,15 +18,15 @@ public:
     void stop() override;
 
 private:
-    void audioThread();
-    void fillStream();
+    static void SDLCALL audioCallback(
+        void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
+    void fillStream(SDL_AudioStream *stream, int requestedBytes);
     void stopLocked();
 
     SDL_AudioStream *m_stream = nullptr;
     Simulator *m_simulator = nullptr;
     std::atomic<bool> m_running = false;
     std::mutex m_lifecycleMutex;
-    std::thread m_thread;
     bool m_diagnostics = false;
     std::uint64_t m_lastDiagnosticTick = 0;
     std::uint64_t m_pcmFrames = 0;
