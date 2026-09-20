@@ -15,6 +15,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #if defined(__ANDROID__)
 #include <jni.h>
@@ -423,7 +424,8 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         entryPoint.close();
         entryPointPath = generatedEntryPoint;
     }
-    if (compiler.compile(entryPointPath.string())) {
+    const bool compiled = compiler.compile(entryPointPath.string());
+    if (compiled) {
         const es_script::Compiler::Output output = compiler.execute();
         configure(output.applicationSettings);
         engine = output.engine;
@@ -441,7 +443,21 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         loadEngine(engine, vehicle, transmission);
         return true;
     }
-    if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("Engine script failed to load");
+    if (m_infoCluster != nullptr) {
+        std::string detail = "Engine script failed to load";
+        std::ifstream errorLog("error_log.log");
+        if (errorLog) {
+            std::ostringstream errors;
+            errors << errorLog.rdbuf();
+            std::string message = errors.str();
+            if (!message.empty()) {
+                std::replace(message.begin(), message.end(), '\n', ' ');
+                if (message.size() > 180) message.resize(180);
+                detail += " | " + message;
+            }
+        }
+        m_infoCluster->setLogMessage(detail);
+    }
 #endif
     return false;
 }
@@ -669,9 +685,19 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // frequency (and cylinder count). 2 kHz was audibly coarse in earlier
     // experiments; 6 kHz keeps substantially more temporal resolution while
     // cutting the default 10 kHz LS workload by 55%. 4.5 kHz is the next quality/performance point after the 6 kHz build still dropped below 20 FPS under throttle.
-    constexpr double AndroidMaxSimulationFrequency = 4500.0;
+    // Most engines run at the proven 4.5 kHz mobile point. High-rev and
+    // high-cylinder-count engines are more sensitive to the coarse physics
+    // timestep, so give them extra temporal resolution instead of letting
+    // their mechanism become numerically unstable.
+    constexpr double AndroidBaseSimulationFrequency = 4500.0;
+    constexpr double AndroidSensitiveSimulationFrequency = 6000.0;
+    const bool numericallySensitive =
+        engine->getCylinderCount() >= 8 || engine->getRedline() >= units::rpm(7500);
+    const double androidFrequencyCap = numericallySensitive
+        ? AndroidSensitiveSimulationFrequency
+        : AndroidBaseSimulationFrequency;
     m_simulator->setSimulationFrequency(
-        std::min(engine->getSimulationFrequency(), AndroidMaxSimulationFrequency));
+        std::min(engine->getSimulationFrequency(), androidFrequencyCap));
 #else
     m_simulator->setSimulationFrequency(engine->getSimulationFrequency());
 #endif
