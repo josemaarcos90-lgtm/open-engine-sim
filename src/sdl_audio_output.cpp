@@ -45,11 +45,13 @@ void SDLCALL SdlAudioOutput::audioCallback(
     void *userdata, SDL_AudioStream *stream, int additionalAmount, int)
 {
     auto *output = static_cast<SdlAudioOutput *>(userdata);
-    if (output == nullptr || !output->m_running || output->m_simulator == nullptr ||
-        additionalAmount <= 0) {
-        return;
+    if (output == nullptr) return;
+    output->m_callbacksInFlight.fetch_add(1, std::memory_order_acq_rel);
+    if (output->m_running.load(std::memory_order_acquire) &&
+        output->m_simulator != nullptr && additionalAmount > 0) {
+        output->fillStream(stream, additionalAmount);
     }
-    output->fillStream(stream, additionalAmount);
+    output->m_callbacksInFlight.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
@@ -104,11 +106,18 @@ void SdlAudioOutput::stop() {
 }
 
 void SdlAudioOutput::stopLocked() {
-    m_running = false;
-    if (m_stream != nullptr) {
-        SDL_SetAudioStreamGetCallback(m_stream, nullptr, nullptr);
-        SDL_DestroyAudioStream(m_stream);
-    }
+    // Hotload safety: publish the stopped state first, detach SDL's callback,
+    // then wait for a callback that was already executing to leave before the
+    // old Simulator can be destroyed by EngineSimApplication.
+    m_running.store(false, std::memory_order_release);
+    SDL_AudioStream *oldStream = m_stream;
     m_stream = nullptr;
+    if (oldStream != nullptr) {
+        SDL_SetAudioStreamGetCallback(oldStream, nullptr, nullptr);
+        while (m_callbacksInFlight.load(std::memory_order_acquire) != 0) {
+            SDL_Delay(1);
+        }
+        SDL_DestroyAudioStream(oldStream);
+    }
     m_simulator = nullptr;
 }
