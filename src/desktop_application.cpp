@@ -245,6 +245,9 @@ bool EngineSimApplication::tick() {
             checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | antes input");
         }
 #endif
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando processEngineInput");
+#endif
         processEngineInput(dt);
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0 && (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0))
@@ -252,6 +255,9 @@ bool EngineSimApplication::tick() {
 #endif
 #if defined(__ANDROID__)
         const std::uint64_t processStart = m_platform->ticks();
+#endif
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando process");
 #endif
         if (!m_paused || m_platform->wasKeyPressed(DesktopKey::Right)) process(dt);
 #if defined(__ANDROID__)
@@ -262,7 +268,13 @@ bool EngineSimApplication::tick() {
         m_lastProcessMs = static_cast<float>(m_platform->ticks() - processStart);
 #endif
     }
+#if defined(__ANDROID__)
+    if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando UI update");
+#endif
     if (m_engineView != nullptr) m_uiManager.update(dt);
+#if defined(__ANDROID__)
+    if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | UI update OK");
+#endif
 #if defined(__ANDROID__)
     // JNI polling is only needed while the Android document picker is active.
     // The previous unconditional poll crossed Java/native boundaries every tick.
@@ -307,7 +319,13 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
         const std::uint64_t renderStart = m_platform->ticks();
 #endif
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando renderScene");
+#endif
         renderScene();
+#if defined(__ANDROID__)
+        if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | renderScene OK");
+#endif
 #if defined(__ANDROID__)
         m_lastRenderMs = static_cast<float>(m_platform->ticks() - renderStart);
 #endif
