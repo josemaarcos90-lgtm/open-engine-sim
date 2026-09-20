@@ -34,6 +34,7 @@ namespace es_script {
 
         void initialize(const std::string &assetDirectory);
         bool compile(const piranha::IrPath &path);
+        const std::string &getLastErrorText() const { return m_lastErrorText; }
         Output execute();
         void destroy();
 
@@ -44,6 +45,7 @@ namespace es_script {
         LanguageRules m_rules;
         piranha::Compiler *m_compiler;
         piranha::NodeProgram m_program;
+        std::string m_lastErrorText;
     };
 
 } /* namespace es_script */
