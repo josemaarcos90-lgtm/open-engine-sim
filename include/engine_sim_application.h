@@ -202,6 +202,8 @@ class EngineSimApplication {
         std::uint64_t m_lastRenderTick = 0;
 #if defined(__ANDROID__)
         std::uint64_t m_lastPerfReportTick = 0;
+        std::uint64_t m_lastEnginePickerPollTick = 0;
+        bool m_externalEnginePickerPending = false;
         float m_lastProcessMs = 0.0f;
         float m_lastRenderMs = 0.0f;
 #endif
