@@ -685,19 +685,12 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // frequency (and cylinder count). 2 kHz was audibly coarse in earlier
     // experiments; 6 kHz keeps substantially more temporal resolution while
     // cutting the default 10 kHz LS workload by 55%. 4.5 kHz is the next quality/performance point after the 6 kHz build still dropped below 20 FPS under throttle.
-    // Most engines run at the proven 4.5 kHz mobile point. High-rev and
-    // high-cylinder-count engines are more sensitive to the coarse physics
-    // timestep, so give them extra temporal resolution instead of letting
-    // their mechanism become numerically unstable.
-    constexpr double AndroidBaseSimulationFrequency = 4500.0;
-    constexpr double AndroidSensitiveSimulationFrequency = 6000.0;
-    const bool numericallySensitive =
-        engine->getCylinderCount() >= 8 || engine->getRedline() >= units::rpm(7500);
-    const double androidFrequencyCap = numericallySensitive
-        ? AndroidSensitiveSimulationFrequency
-        : AndroidBaseSimulationFrequency;
+    // Alpha 15's 4.5 kHz cap is the proven stable performance point on Android.
+    // Do not raise it per engine: the 6 kHz experiment reduced frame rate and
+    // did not fix the malformed-engine issue, so that issue is not a timestep fix.
+    constexpr double AndroidMaxSimulationFrequency = 4500.0;
     m_simulator->setSimulationFrequency(
-        std::min(engine->getSimulationFrequency(), androidFrequencyCap));
+        std::min(engine->getSimulationFrequency(), AndroidMaxSimulationFrequency));
 #else
     m_simulator->setSimulationFrequency(engine->getSimulationFrequency());
 #endif
