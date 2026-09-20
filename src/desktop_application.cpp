@@ -573,9 +573,17 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     m_simulator = engine->createSimulator(vehicle, transmission, outputAudioSampleRate);
     m_viewParameters.Layer1 = engine->getMaxDepth();
     engine->calculateDisplacement();
-    // Preserve the script's simulation resolution. Reducing this to 2 kHz
-    // made low-speed combustion arrive in audible, quantized pitch steps.
+#if defined(__ANDROID__)
+    // Mobile performance mode. Physics cost scales almost linearly with this
+    // frequency (and cylinder count). 2 kHz was audibly coarse in earlier
+    // experiments; 6 kHz keeps substantially more temporal resolution while
+    // cutting the default 10 kHz LS workload by 40%.
+    constexpr double AndroidMaxSimulationFrequency = 6000.0;
+    m_simulator->setSimulationFrequency(
+        std::min(engine->getSimulationFrequency(), AndroidMaxSimulationFrequency));
+#else
     m_simulator->setSimulationFrequency(engine->getSimulationFrequency());
+#endif
     // SDL owns a stable output lead. Do not speed the simulation up/down to
     // chase the input reservoir: that feedback loop audibly bends pitch at
     // low RPM when a render frame varies in duration.
