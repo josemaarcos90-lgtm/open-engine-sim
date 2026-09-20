@@ -581,7 +581,10 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         return engine != nullptr && vehicle != nullptr && transmission != nullptr;
     };
 
-    // Packaged main.mr is an entry point. Imported engines are catalog-style modules:\n    // compiling/executing them directly creates no objects and adds avoidable allocation churn.\n    const bool isUserEngine = relativeScriptPath.rfind("engines/user/", 0) == 0;\n    bool loaded = isUserEngine ? false : compileEntry(scriptPath);
+    // Packaged main.mr is an entry point. Imported engines are catalog-style modules:
+    // compiling/executing them directly creates no objects and adds avoidable allocation churn.
+    const bool isUserEngine = relativeScriptPath.rfind("engines/user/", 0) == 0;
+    bool loaded = isUserEngine ? false : compileEntry(scriptPath);
     std::filesystem::path generatedEntryPoint;
     if (!loaded && relativeScriptPath != "main.mr") {
 #if defined(__ANDROID__)
