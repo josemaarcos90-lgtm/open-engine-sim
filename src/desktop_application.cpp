@@ -196,13 +196,18 @@ bool EngineSimApplication::tick() {
         if (!importedScript.empty()) {
             m_pendingScriptPath = importedScript;
             m_externalEnginePickerPending = false;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);
         }
     }
 #endif
     if (!m_pendingScriptPath.empty()) {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
-        if (loadScript(selectedScript)) m_currentScriptPath = selectedScript;
+        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);
+        if (loadScript(selectedScript)) {
+            m_currentScriptPath = selectedScript;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);
+        }
     }
     // Rendering is substantially more expensive than the audio-producing
     // simulation on the SDL path. Reserve CPU slices for simulation so
@@ -420,6 +425,13 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
     Transmission *transmission = nullptr;
     std::filesystem::path scriptPath = std::filesystem::path(m_assetPath) / relativeScriptPath;
     std::filesystem::path entryPointPath = scriptPath;
+#if defined(__ANDROID__)
+    if (!std::filesystem::exists(scriptPath)) {
+        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR missing: " + scriptPath.string());
+        compiler.destroy();
+        return false;
+    }
+#endif
     std::filesystem::path generatedEntryPoint;
     // Engine files define public node main but do not invoke it. The normal
     // main.mr does exactly that after importing an engine, so create the same
