@@ -97,6 +97,10 @@ bool EngineSimApplication::tick() {
     if (m_lastTick == 0) m_lastTick = m_platform->ticks();
 #if defined(__EMSCRIPTEN__)
     constexpr std::uint64_t renderIntervalMs = 0;
+#elif defined(__ANDROID__)
+    // 30 Hz keeps the dashboard responsive while leaving CPU time for the
+    // high-rate engine/audio simulation.
+    constexpr std::uint64_t renderIntervalMs = 33;
 #else
     constexpr std::uint64_t renderIntervalMs = 50;
 #endif
