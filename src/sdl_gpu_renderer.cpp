@@ -2,6 +2,9 @@
 #include "../include/shaders.h"
 
 #include <SDL3/SDL.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 #include <algorithm>
 #include <cstddef>
@@ -205,6 +208,10 @@ void SdlGpuRenderer::shutdown() {
 }
 
 void SdlGpuRenderer::beginFrame(const ysVector &clearColor) {
+#ifdef __ANDROID__
+    static bool first = true;
+    if (first) { __android_log_print(ANDROID_LOG_INFO, "OpenEngineSimRender", "FIRST beginFrame"); first = false; }
+#endif
     m_clearColor = clearColor;
     m_vertices = nullptr;
     m_indices = nullptr;
@@ -231,6 +238,10 @@ void SdlGpuRenderer::uploadGeometry(
     m_indices = indices;
     m_vertexCount = vertexCount;
     m_indexCount = indexCount;
+#ifdef __ANDROID__
+    static bool firstUpload = true;
+    if (firstUpload) { __android_log_print(ANDROID_LOG_INFO, "OpenEngineSimRender", "FIRST uploadGeometry vertices=%d indices=%d", vertexCount, indexCount); firstUpload = false; }
+#endif
 }
 
 void SdlGpuRenderer::submitGeometry(
@@ -251,10 +262,19 @@ void SdlGpuRenderer::submitGeometry(
 }
 
 void SdlGpuRenderer::endFrame() {
+#ifdef __ANDROID__
+    static int frameNumber = 0; ++frameNumber;
+    if (frameNumber <= 5 || frameNumber == 30 || frameNumber == 120) __android_log_print(ANDROID_LOG_INFO, "OpenEngineSimRender", "endFrame #%d vertices=%d indices=%d submissions=%zu viewport=%.0fx%.0f", frameNumber, m_vertexCount, m_indexCount, m_submissions.size(), m_sceneViewportWidth, m_sceneViewportHeight);
+#endif
     if (m_gpuDevice == nullptr || m_window == nullptr) return;
 
     SDL_GPUCommandBuffer *commands = SDL_AcquireGPUCommandBuffer(m_gpuDevice);
-    if (commands == nullptr) return;
+    if (commands == nullptr) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "AcquireGPUCommandBuffer FAILED: %s", SDL_GetError());
+#endif
+        return;
+    }
 
     if (m_vertexCount > 0 && m_indexCount > 0) {
         void *vertexUpload = SDL_MapGPUTransferBuffer(m_gpuDevice, m_vertexTransferBuffer, true);
@@ -289,6 +309,9 @@ void SdlGpuRenderer::endFrame() {
             commands, static_cast<SDL_Window *>(m_window), &swapchainTexture,
             &swapchainWidth, &swapchainHeight)) {
         SDL_CancelGPUCommandBuffer(commands);
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "Acquire swapchain FAILED: %s", SDL_GetError());
+#endif
         return;
     }
 
@@ -392,7 +415,14 @@ void SdlGpuRenderer::endFrame() {
         }
         if (uiPass != nullptr) SDL_EndGPURenderPass(uiPass);
     }
-    SDL_SubmitGPUCommandBuffer(commands);
+    #ifdef __ANDROID__
+    if (frameNumber <= 5 || frameNumber == 30 || frameNumber == 120) __android_log_print(ANDROID_LOG_INFO, "OpenEngineSimRender", "swapchain=%p size=%ux%u sceneTexture=%p depth=%p -> SUBMIT", swapchainTexture, swapchainWidth, swapchainHeight, m_sceneTexture, m_depthTexture);
+    #endif
+    if (!SDL_SubmitGPUCommandBuffer(commands)) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "SubmitGPUCommandBuffer FAILED: %s", SDL_GetError());
+#endif
+    }
 }
 
 const char *SdlGpuRenderer::lastError() const {
