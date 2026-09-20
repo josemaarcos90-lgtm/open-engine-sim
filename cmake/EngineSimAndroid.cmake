@@ -9,7 +9,7 @@ add_library(main SHARED
     src/desktop_platform_sdl.cpp
     src/sdl_audio_util.cpp
     src/sdl_audio_output.cpp
-    src/sdl_gpu_renderer.cpp)
+    src/web_gl_renderer.cpp)
 
 target_link_libraries(main PRIVATE SDL3::SDL3 engine-sim-visualization log)
 target_compile_features(main PRIVATE cxx_std_17)
