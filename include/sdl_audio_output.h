@@ -27,6 +27,7 @@ private:
     Simulator *m_simulator = nullptr;
     std::atomic<bool> m_running = false;
     std::mutex m_lifecycleMutex;
+    std::atomic<int> m_callbacksInFlight = 0;
     bool m_diagnostics = false;
     std::uint64_t m_lastDiagnosticTick = 0;
     std::uint64_t m_pcmFrames = 0;
