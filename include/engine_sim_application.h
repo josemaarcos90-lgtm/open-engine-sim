@@ -109,6 +109,7 @@ class EngineSimApplication {
         void toggleFullscreen();
         void showControlsOverlay();
         void showEnginePickerOverlay();
+        void requestExternalEnginePicker();
         void changeGear(int direction);
         void setTouchStarterHeld(bool held);
         void setTouchThrottle(double value, bool held);
