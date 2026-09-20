@@ -16,12 +16,12 @@
 #include <cstdio>
 #include <string>
 
+volatile sig_atomic_t gCrashSubstage = 0;
+
 namespace {
 constexpr const char *LogTag = "OpenEngineSim";
 char gCrashLogPath[512] = {};
 volatile sig_atomic_t gCrashStage = 0;
-volatile sig_atomic_t gCrashSubstage = 0;
-
 void nativeCrashHandler(int signalNumber) {
     char buffer[256];
     const int length = snprintf(buffer, sizeof(buffer),
