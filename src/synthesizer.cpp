@@ -165,7 +165,12 @@ bool Synthesizer::pumpAudioRendering() {
         return false;
     }
 
+    #if defined(__ANDROID__)
+    // Give the convolution worker enough PCM headroom to survive CPU spikes.
+    constexpr int outputLeadSamples = 4096;
+#else
     constexpr int outputLeadSamples = 1024;
+#endif
     const int targetOutputSamples = std::min(outputLeadSamples, m_audioBufferSize - 1);
     const int n = std::min(
         std::max(0, targetOutputSamples - m_audioBufferedSamples.load()),
@@ -341,7 +346,12 @@ void Synthesizer::renderAudio() {
     std::unique_lock<std::mutex> inputLock(m_inputLock);
     // A second, modest reservoir decouples the render worker from the device
     // queue without adding a perceptible control-to-sound delay.
+    #if defined(__ANDROID__)
+    // Give the convolution worker enough PCM headroom to survive CPU spikes.
+    constexpr int outputLeadSamples = 4096;
+#else
     constexpr int outputLeadSamples = 1024;
+#endif
     const int targetOutputSamples = std::min(outputLeadSamples, m_audioBufferSize - 1);
 
     m_cv0.wait(inputLock, [this, outputLeadSamples] {
