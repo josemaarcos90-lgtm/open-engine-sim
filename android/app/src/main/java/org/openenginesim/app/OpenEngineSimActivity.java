@@ -154,6 +154,22 @@ public class OpenEngineSimActivity extends SDLActivity {
         if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
     };
 
+    public void checkpointMrLog(final String text) {
+        try {
+            final File dir = new File(getFilesDir(), "logs");
+            if (!dir.mkdirs() && !dir.isDirectory()) throw new IOException("Could not create " + dir);
+            Files.write(new File(dir, "mr_last_session.txt").toPath(),
+                text.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            Log.e(TAG, "Failed to write internal MR checkpoint", exception);
+        }
+
+        // Show every checkpoint immediately on the same green diagnostic
+        // overlay used during Android startup. This runs on the UI thread even
+        // if the native compiler later blocks.
+        showMrDiagnostics(text);
+    }
+
     public String writeMrLog(final String text) {
         final String name = "mr_error_" + System.currentTimeMillis() + ".txt";
         try {
