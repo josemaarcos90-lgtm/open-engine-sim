@@ -979,6 +979,9 @@ void EngineSimApplication::refreshUserInterface() {
     m_infoCluster->setEngine(m_iceEngine);
     m_rightGaugeCluster->m_simulator = m_simulator;
     m_rightGaugeCluster->setEngine(m_iceEngine);
+    // refreshUserInterface() can be followed by renderScene() in this same
+    // tick, before UiManager::update() has ever run. Wire nested widgets now.
+    m_rightGaugeCluster->update(0.0f);
     m_oscCluster->setSimulator(m_simulator);
     m_performanceCluster->setSimulator(m_simulator);
     m_loadSimulationCluster->setSimulator(m_simulator);
