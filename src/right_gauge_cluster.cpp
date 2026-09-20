@@ -197,6 +197,17 @@ void RightGaugeCluster::onDrag(const Point &, const Point &, const Point &mouse)
 }
 
 void RightGaugeCluster::render() {
+    // Hotload rebuilds the UI and may render it before the next update().
+    // Propagate dependencies here as well so child widgets are valid on their
+    // very first frame.
+    if (m_fuelCluster != nullptr) {
+        m_fuelCluster->m_engine = m_engine;
+        m_fuelCluster->m_simulator = m_simulator;
+    }
+    if (m_combusionChamberStatus != nullptr) m_combusionChamberStatus->m_engine = m_engine;
+    if (m_throttleDisplay != nullptr) m_throttleDisplay->m_engine = m_engine;
+    if (m_afrCluster != nullptr) m_afrCluster->m_engine = m_engine;
+
     drawFrame(m_bounds, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
     const Bounds tachSpeedCluster = m_bounds.verticalSplit(0.5f, 1.0f);
@@ -360,9 +371,9 @@ double RightGaugeCluster::getRedline() const {
 }
 
 double RightGaugeCluster::getSpeed() const {
-    return (m_simulator->getVehicle() != nullptr)
-        ? m_simulator->getVehicle()->getSpeed()
-        : 0;
+    if (m_simulator == nullptr) return 0.0;
+    Vehicle *vehicle = m_simulator->getVehicle();
+    return (vehicle != nullptr) ? vehicle->getSpeed() : 0.0;
 }
 
 double RightGaugeCluster::getManifoldPressure() const {
