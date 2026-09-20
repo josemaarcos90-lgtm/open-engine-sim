@@ -21,7 +21,11 @@ es_script::Compiler::Output *es_script::Compiler::output() {
 void es_script::Compiler::initialize(const std::string &assetDirectory) {
     m_compiler = new piranha::Compiler(&m_rules);
     m_compiler->setFileExtension(".mr");
+    // Engine scripts import both core definitions from assets/es and helper
+    // files from the packaged asset tree. Android user imports are copied into
+    // that same tree, so expose both roots to Piranha.
     m_compiler->addSearchPath(assetDirectory + "/es/");
+    m_compiler->addSearchPath(assetDirectory + "/");
 
     m_rules.initialize();
 }
