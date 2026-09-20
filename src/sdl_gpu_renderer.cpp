@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <jni.h>
 #endif
 
 #include <algorithm>
@@ -19,6 +20,19 @@ namespace {
 // starter begins producing live sample traces.
 constexpr int MaxVertices = 500000;
 constexpr int MaxIndices = 1000000;
+#ifdef __ANDROID__
+void screenRenderStatus(const std::string &s) {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    if (!cls) return;
+    jmethodID method = env->GetMethodID(cls, "showRenderDiagnostics", "(Ljava/lang/String;)V");
+    if (method) { jstring text = env->NewStringUTF(s.c_str()); env->CallVoidMethod(activity, method, text); env->DeleteLocalRef(text); }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls);
+}
+#endif
 
 std::vector<std::uint8_t> loadBinaryFile(const std::string &path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -271,6 +285,7 @@ void SdlGpuRenderer::endFrame() {
     SDL_GPUCommandBuffer *commands = SDL_AcquireGPUCommandBuffer(m_gpuDevice);
     if (commands == nullptr) {
 #ifdef __ANDROID__
+        screenRenderStatus("FRAME " + std::to_string(frameNumber) + "\nCOMMAND BUFFER: FALHOU\n" + SDL_GetError());
         __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "AcquireGPUCommandBuffer FAILED: %s", SDL_GetError());
 #endif
         return;
@@ -310,6 +325,7 @@ void SdlGpuRenderer::endFrame() {
             &swapchainWidth, &swapchainHeight)) {
         SDL_CancelGPUCommandBuffer(commands);
 #ifdef __ANDROID__
+        screenRenderStatus("FRAME " + std::to_string(frameNumber) + "\nSWAPCHAIN: FALHOU\n" + SDL_GetError());
         __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "Acquire swapchain FAILED: %s", SDL_GetError());
 #endif
         return;
@@ -420,9 +436,26 @@ void SdlGpuRenderer::endFrame() {
     #endif
     if (!SDL_SubmitGPUCommandBuffer(commands)) {
 #ifdef __ANDROID__
+        screenRenderStatus("FRAME " + std::to_string(frameNumber) + "\nSUBMIT GPU: FALHOU\n" + SDL_GetError());
         __android_log_print(ANDROID_LOG_ERROR, "OpenEngineSimRender", "SubmitGPUCommandBuffer FAILED: %s", SDL_GetError());
 #endif
     }
+#ifdef __ANDROID__
+    if (frameNumber == 1 || frameNumber == 5 || frameNumber == 30 || frameNumber == 120) {
+        std::string status =
+            "FRAME: " + std::to_string(frameNumber) +
+            "\nBEGIN FRAME: OK" +
+            "\nVERTICES: " + std::to_string(m_vertexCount) +
+            "\nINDICES: " + std::to_string(m_indexCount) +
+            "\nSUBMISSIONS: " + std::to_string(m_submissions.size()) +
+            "\nVIEWPORT: " + std::to_string((int)m_sceneViewportWidth) + " x " + std::to_string((int)m_sceneViewportHeight) +
+            "\nSWAPCHAIN: " + std::to_string(swapchainWidth) + " x " + std::to_string(swapchainHeight) +
+            "\nSCENE TEXTURE: " + std::string(m_sceneTexture ? "OK" : "NULL") +
+            "\nDEPTH TEXTURE: " + std::string(m_depthTexture ? "OK" : "NULL") +
+            "\nSUBMIT GPU: OK";
+        screenRenderStatus(status);
+    }
+#endif
 }
 
 const char *SdlGpuRenderer::lastError() const {
