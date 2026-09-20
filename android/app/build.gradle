@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 3
-        versionName '0.2.2-android-alpha6-opt'
+        versionCode 4
+        versionName '0.2.2-android-alpha7-releaseopt'
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -52,6 +52,18 @@ android {
     buildTypes {
         debug {
             minifyEnabled false
+            // This APK is installed as a debug package, but the simulator itself
+            // is a CPU-heavy native workload. Android's normal Debug CMake flags
+            // (-O0) make the physics/synthesis path several times slower.
+            externalNativeBuild {
+                cmake {
+                    arguments '-DCMAKE_BUILD_TYPE=Release',
+                        '-DCMAKE_C_FLAGS_DEBUG=-O3 -DNDEBUG',
+                        '-DCMAKE_CXX_FLAGS_DEBUG=-O3 -DNDEBUG',
+                        '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG',
+                        '-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG'
+                }
+            }
         }
         release {
             minifyEnabled false
