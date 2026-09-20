@@ -1,4 +1,8 @@
 #include "../include/engine_sim_application.h"
+#if defined(__ANDROID__)
+#include <csignal>
+extern volatile sig_atomic_t gCrashSubstage;
+#endif
 
 #include "../include/combustion_chamber_object.h"
 #include "../include/connecting_rod_object.h"
@@ -248,7 +252,13 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando processEngineInput");
 #endif
+#if defined(__ANDROID__)
+        gCrashSubstage = 11;
+#endif
         processEngineInput(dt);
+#if defined(__ANDROID__)
+        gCrashSubstage = 15;
+#endif
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0 && (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0))
             checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | input OK");
@@ -259,7 +269,13 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando process");
 #endif
+#if defined(__ANDROID__)
+        gCrashSubstage = 12;
+#endif
         if (!m_paused || m_platform->wasKeyPressed(DesktopKey::Right)) process(dt);
+#if defined(__ANDROID__)
+        gCrashSubstage = 15;
+#endif
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0 && (m_postLoadTickNumber <= 5 || (m_postLoadTickNumber % 30) == 0))
             checkpointAndroidMr("POST LOAD WINDOW | tick " + std::to_string(m_postLoadTickNumber) + " | process OK");
@@ -271,7 +287,13 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
     if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando UI update");
 #endif
+#if defined(__ANDROID__)
+    gCrashSubstage = 13;
+#endif
     if (m_engineView != nullptr) m_uiManager.update(dt);
+#if defined(__ANDROID__)
+    gCrashSubstage = 15;
+#endif
 #if defined(__ANDROID__)
     if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | UI update OK");
 #endif
@@ -322,7 +344,13 @@ bool EngineSimApplication::tick() {
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | entrando renderScene");
 #endif
+#if defined(__ANDROID__)
+        gCrashSubstage = 14;
+#endif
         renderScene();
+#if defined(__ANDROID__)
+        gCrashSubstage = 15;
+#endif
 #if defined(__ANDROID__)
         if (m_postLoadProbeTicks > 0) checkpointAndroidMr("POST LOAD WINDOW | renderScene OK");
 #endif
