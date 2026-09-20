@@ -196,25 +196,30 @@ bool EngineSimApplication::tick() {
         if (!importedScript.empty()) {
             m_pendingScriptPath = importedScript;
             m_externalEnginePickerPending = false;
-            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);
-            #if defined(__ANDROID__)
-        m_mrDiagnosticUntilTick = now + 15000;
-#endif
+            m_mrDiagnosticMessage = "MR 1/3 SELECTED | " + importedScript;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
+            m_mrDiagnosticUntilTick = now + 30000;
         }
     }
 #endif
     if (!m_pendingScriptPath.empty()) {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
+#if defined(__ANDROID__)
+        m_mrDiagnosticMessage = "MR 2/3 COMPILING | " + selectedScript;
+        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
+        m_mrDiagnosticUntilTick = now + 30000;
+#else
         if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);
-        #if defined(__ANDROID__)
-        m_mrDiagnosticUntilTick = now + 15000;
 #endif
         if (loadScript(selectedScript)) {
             m_currentScriptPath = selectedScript;
+#if defined(__ANDROID__)
+            m_mrDiagnosticMessage = "MR 3/3 LOADED OK | " + selectedScript;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
+            m_mrDiagnosticUntilTick = now + 30000;
+#else
             if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);
-            #if defined(__ANDROID__)
-        m_mrDiagnosticUntilTick = now + 15000;
 #endif
         }
     }
@@ -232,6 +237,9 @@ bool EngineSimApplication::tick() {
         m_lastRenderTick = now;
     }
 #if defined(__ANDROID__)
+    if (m_infoCluster != nullptr && now < m_mrDiagnosticUntilTick && !m_mrDiagnosticMessage.empty()) {
+        m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
+    }
     if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000 && !m_externalEnginePickerPending && m_pendingScriptPath.empty() && now >= m_mrDiagnosticUntilTick) {
         m_lastPerfReportTick = now;
         const int simHz = m_simulator != nullptr
@@ -530,7 +538,13 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
                 detail += " | " + message;
             }
         }
+#if defined(__ANDROID__)
+        m_mrDiagnosticMessage = "MR ERROR | " + detail;
+        m_mrDiagnosticUntilTick = m_platform != nullptr ? m_platform->ticks() + 30000 : 30000;
+        m_infoCluster->setLogMessage(m_mrDiagnosticMessage);
+#else
         m_infoCluster->setLogMessage(detail);
+#endif
     }
 #endif
     return false;
