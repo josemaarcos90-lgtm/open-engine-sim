@@ -28,6 +28,9 @@ bool DesktopPlatformSdl::initialize(const std::string &title, int width, int hei
 #endif
 
     SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#if defined(__ANDROID__)
+    windowFlags |= SDL_WINDOW_FULLSCREEN;
+#endif
 #if defined(__EMSCRIPTEN__)
     // SDL maps this context to WebGL 2. Native desktop builds keep their SDL
     // GPU presentation path and therefore do not request an OpenGL context.
@@ -44,10 +47,22 @@ bool DesktopPlatformSdl::initialize(const std::string &title, int width, int hei
 
     SDL_GetWindowSize(m_window, &m_windowLogicalWidth, &m_windowLogicalHeight);
     SDL_GetWindowSizeInPixels(m_window, &m_windowWidth, &m_windowHeight);
+#if defined(__ANDROID__)
+    SDL_PumpEvents();
+    SDL_GetWindowSize(m_window, &m_windowLogicalWidth, &m_windowLogicalHeight);
+    SDL_GetWindowSizeInPixels(m_window, &m_windowWidth, &m_windowHeight);
+    m_fullscreen = true;
+#endif
     return true;
 }
 
 void DesktopPlatformSdl::pumpEvents() {
+#if defined(__ANDROID__)
+    if (m_window != nullptr) {
+        SDL_GetWindowSize(m_window, &m_windowLogicalWidth, &m_windowLogicalHeight);
+        SDL_GetWindowSizeInPixels(m_window, &m_windowWidth, &m_windowHeight);
+    }
+#endif
     m_keysPressed.fill(false);
     m_mousePressed.fill(false);
     m_mouseReleased.fill(false);
