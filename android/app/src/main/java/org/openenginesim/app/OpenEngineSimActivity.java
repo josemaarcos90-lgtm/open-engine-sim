@@ -2,6 +2,7 @@ package org.openenginesim.app;
 
 import android.content.res.AssetManager;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
@@ -32,6 +33,9 @@ public class OpenEngineSimActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Lock the simulator to landscape before SDL creates its surface so
+        // startup never briefly builds a portrait-sized GL surface.
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         try {
             syncAssets();
             assetStatus = validateAssets();
@@ -41,6 +45,12 @@ public class OpenEngineSimActivity extends SDLActivity {
         }
         super.onCreate(savedInstanceState);
         updateNativeStatus("Aguardando entrada no codigo C++...");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
 
     public void openEngineFilePicker() {
