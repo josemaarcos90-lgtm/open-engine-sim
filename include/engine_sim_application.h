@@ -199,6 +199,11 @@ class EngineSimApplication {
         float m_averageFramerate = 60.0f;
         std::uint64_t m_lastTick = 0;
         std::uint64_t m_lastRenderTick = 0;
+#if defined(__ANDROID__)
+        std::uint64_t m_lastPerfReportTick = 0;
+        float m_lastProcessMs = 0.0f;
+        float m_lastRenderMs = 0.0f;
+#endif
 
 #ifdef ATG_ENGINE_SIM_VIDEO_CAPTURE
         atg_dtv::Encoder m_encoder;
