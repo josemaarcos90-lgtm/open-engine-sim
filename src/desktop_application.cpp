@@ -98,9 +98,10 @@ bool EngineSimApplication::tick() {
 #if defined(__EMSCRIPTEN__)
     constexpr std::uint64_t renderIntervalMs = 0;
 #elif defined(__ANDROID__)
-    // Performance-unlocked Android build. Present whenever the main loop can
-    // produce a frame; the GPU swap is already non-blocking on this path.
-    constexpr std::uint64_t renderIntervalMs = 0;
+    // Keep presentation at 30 Hz on Android. The simulator/audio path keeps
+    // running between presentations, so spare CPU time goes to synthesis
+    // instead of producing 40-50 FPS bursts that can starve audio.
+    constexpr std::uint64_t renderIntervalMs = 33;
 #else
     constexpr std::uint64_t renderIntervalMs = 50;
 #endif
