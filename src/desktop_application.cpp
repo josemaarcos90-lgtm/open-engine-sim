@@ -196,17 +196,17 @@ bool EngineSimApplication::tick() {
         if (!importedScript.empty()) {
             m_pendingScriptPath = importedScript;
             m_externalEnginePickerPending = false;
-            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);\n            m_mrDiagnosticUntilTick = now + 15000;
         }
     }
 #endif
     if (!m_pendingScriptPath.empty()) {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
-        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);
+        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);\n        m_mrDiagnosticUntilTick = now + 15000;
         if (loadScript(selectedScript)) {
             m_currentScriptPath = selectedScript;
-            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);\n            m_mrDiagnosticUntilTick = now + 15000;
         }
     }
     // Rendering is substantially more expensive than the audio-producing
@@ -223,7 +223,7 @@ bool EngineSimApplication::tick() {
         m_lastRenderTick = now;
     }
 #if defined(__ANDROID__)
-    if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000 && !m_externalEnginePickerPending && m_pendingScriptPath.empty()) {
+    if (m_infoCluster != nullptr && now - m_lastPerfReportTick >= 1000 && !m_externalEnginePickerPending && m_pendingScriptPath.empty() && now >= m_mrDiagnosticUntilTick) {
         m_lastPerfReportTick = now;
         const int simHz = m_simulator != nullptr
             ? static_cast<int>(m_simulator->getSimulationFrequency()) : 0;
