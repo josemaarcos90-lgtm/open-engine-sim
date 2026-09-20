@@ -20,13 +20,14 @@ namespace {
 constexpr const char *LogTag = "OpenEngineSim";
 char gCrashLogPath[512] = {};
 volatile sig_atomic_t gCrashStage = 0;
+volatile sig_atomic_t gCrashSubstage = 0;
 
 void nativeCrashHandler(int signalNumber) {
     char buffer[256];
     const int length = snprintf(buffer, sizeof(buffer),
-        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\n"
-        "stage 10=main loop, 20=post-load process, 30=post-load render, 40=audio callback\n",
-        signalNumber, static_cast<int>(gCrashStage));
+        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\nsubstage=%d\n"
+        "stage 10=main loop; substage 11=input, 12=process, 13=UI, 14=render, 15=idle\n",
+        signalNumber, static_cast<int>(gCrashStage), static_cast<int>(gCrashSubstage));
     if (gCrashLogPath[0] != '\0') {
         const int fd = open(gCrashLogPath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
         if (fd >= 0) {
