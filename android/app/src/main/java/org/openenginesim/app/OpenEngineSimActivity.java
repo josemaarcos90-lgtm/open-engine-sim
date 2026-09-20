@@ -75,7 +75,7 @@ public class OpenEngineSimActivity extends SDLActivity {
                 return;
             }
             displayName = displayName.replaceAll("[^A-Za-z0-9._-]", "_");
-            final File engineDir = new File(getFilesDir(), "assets/user_engines");
+            final File engineDir = new File(getFilesDir(), "assets/engines/user");
             if (!engineDir.mkdirs() && !engineDir.isDirectory()) throw new IOException("Could not create " + engineDir);
             final File destination = new File(engineDir, displayName);
             try (InputStream input = getContentResolver().openInputStream(uri);
@@ -85,7 +85,7 @@ public class OpenEngineSimActivity extends SDLActivity {
                 int count;
                 while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
             }
-            pendingEngineScript = "user_engines/" + displayName;
+            pendingEngineScript = "engines/user/" + displayName;
             Log.i(TAG, "Imported engine script: " + pendingEngineScript);
         } catch (Exception exception) {
             Log.e(TAG, "Failed to import engine script", exception);
