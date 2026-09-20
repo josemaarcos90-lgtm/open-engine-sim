@@ -113,6 +113,17 @@ void checkpointAndroidMr(const std::string &message) {
     if (env->ExceptionCheck()) env->ExceptionClear();
     if (cls) env->DeleteLocalRef(cls);
 }
+
+void hideAndroidMrDiagnostics() {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "hideNativeDiagnostics", "()V") : nullptr;
+    if (method) env->CallVoidMethod(activity, method);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+}
 #endif
 
 // Compose the engine below the camera origin independently of user pan state.
@@ -293,6 +304,7 @@ bool EngineSimApplication::tick() {
         --m_postLoadProbeTicks;
         if (m_postLoadFirstProcessDone && m_postLoadFirstRenderDone) {
             checkpointAndroidMr("POST LOAD | PRIMEIRO PROCESS + RENDER OK");
+            hideAndroidMrDiagnostics();
             m_postLoadProbeTicks = 0;
         }
     }
