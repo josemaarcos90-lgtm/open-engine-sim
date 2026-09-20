@@ -76,6 +76,28 @@ void showAndroidMrDiagnostics(const std::string &message) {
     if (env->ExceptionCheck()) env->ExceptionClear();
     if (cls) env->DeleteLocalRef(cls);
 }
+
+std::string saveAndroidMrLog(const std::string &message) {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return "JNI unavailable";
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "writeMrLog", "(Ljava/lang/String;)Ljava/lang/String;") : nullptr;
+    std::string result = "writeMrLog unavailable";
+    if (method) {
+        jstring text = env->NewStringUTF(message.c_str());
+        auto returned = static_cast<jstring>(env->CallObjectMethod(activity, method, text));
+        env->DeleteLocalRef(text);
+        if (returned) {
+            const char *chars = env->GetStringUTFChars(returned, nullptr);
+            if (chars) { result = chars; env->ReleaseStringUTFChars(returned, chars); }
+            env->DeleteLocalRef(returned);
+        }
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    return result;
+}
 #endif
 
 // Compose the engine below the camera origin independently of user pan state.
@@ -583,6 +605,8 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
         mrTrace << "\nRESULTADO: FALHOU\n";
         mrTrace << "MENSAGEM: " << detail << "\n";
         mrTrace << "\nSe compile() falhou, o proximo passo e capturar o erro interno do Piranha.";
+        const std::string mrLogPath = saveAndroidMrLog(mrTrace.str());
+        mrTrace << "\nLOG SALVO EM:\n" << mrLogPath << "\n";
         showAndroidMrDiagnostics(mrTrace.str());
         m_mrDiagnosticMessage = "MR ERROR | " + detail;
         m_mrDiagnosticUntilTick = m_platform != nullptr ? m_platform->ticks() + 30000 : 30000;
