@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 19
-        versionName '0.2.2-android-alpha23-mr-diagnostics'
+        versionCode 20
+        versionName '0.2.2-android-alpha24-mr-overlay'
 
         ndk {
             abiFilters 'arm64-v8a'
