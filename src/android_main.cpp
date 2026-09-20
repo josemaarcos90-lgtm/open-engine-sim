@@ -12,6 +12,10 @@
 #include <csignal>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/syscall.h>
+#include <ucontext.h>
+#include <dlfcn.h>
+#include <cstdint>
 #include <cstring>
 #include <cstdio>
 #include <string>
@@ -23,14 +27,43 @@ namespace {
 constexpr const char *LogTag = "OpenEngineSim";
 char gCrashLogPath[512] = {};
 volatile sig_atomic_t gCrashStage = 0;
-void nativeCrashHandler(int signalNumber) {
-    char buffer[256];
+uintptr_t gMainModuleBase = 0;
+pid_t gMainThreadTid = 0;
+
+void nativeCrashHandler(int signalNumber, siginfo_t *info, void *context) {
+    uintptr_t pc = 0, lr = 0, sp = 0, fp = 0;
+#if defined(__aarch64__)
+    if (context != nullptr) {
+        const auto *uc = static_cast<const ucontext_t *>(context);
+        pc = static_cast<uintptr_t>(uc->uc_mcontext.pc);
+        lr = static_cast<uintptr_t>(uc->uc_mcontext.regs[30]);
+        sp = static_cast<uintptr_t>(uc->uc_mcontext.sp);
+        fp = static_cast<uintptr_t>(uc->uc_mcontext.regs[29]);
+    }
+#endif
+    const uintptr_t faultAddress = (info != nullptr)
+        ? reinterpret_cast<uintptr_t>(info->si_addr) : 0;
+    const pid_t tid = static_cast<pid_t>(syscall(__NR_gettid));
+    const uintptr_t pcOffset = (gMainModuleBase != 0 && pc >= gMainModuleBase) ? pc - gMainModuleBase : 0;
+    const uintptr_t lrOffset = (gMainModuleBase != 0 && lr >= gMainModuleBase) ? lr - gMainModuleBase : 0;
+
+    char buffer[768];
     const int length = snprintf(buffer, sizeof(buffer),
-        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\nsubstage=%d\ndetail=%d\n"
+        "OPEN ENGINE SIM NATIVE CRASH V2\n"
+        "signal=%d\nstage=%d\nsubstage=%d\ndetail=%d\n"
+        "tid=%d\nmain_tid=%d\nthread=%s\n"
+        "fault_addr=0x%llx\nmodule_base=0x%llx\npc=0x%llx\npc_offset=0x%llx\n"
+        "lr=0x%llx\nlr_offset=0x%llx\nsp=0x%llx\nfp=0x%llx\n"
         "render detail: 141=generateGeometry, 142=object render, 143=UI render, 144=render done, "
         "145=beginFrame, 146=layout/reset, 147=render body, 148=uploadGeometry, 149=endFrame\n",
         signalNumber, static_cast<int>(gCrashStage), static_cast<int>(gCrashSubstage),
-        static_cast<int>(gCrashDetail));
+        static_cast<int>(gCrashDetail), static_cast<int>(tid), static_cast<int>(gMainThreadTid),
+        (tid == gMainThreadTid) ? "MAIN" : "WORKER",
+        static_cast<unsigned long long>(faultAddress),
+        static_cast<unsigned long long>(gMainModuleBase),
+        static_cast<unsigned long long>(pc), static_cast<unsigned long long>(pcOffset),
+        static_cast<unsigned long long>(lr), static_cast<unsigned long long>(lrOffset),
+        static_cast<unsigned long long>(sp), static_cast<unsigned long long>(fp));
     if (gCrashLogPath[0] != '\0') {
         const int fd = open(gCrashLogPath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
         if (fd >= 0) {
@@ -38,17 +71,32 @@ void nativeCrashHandler(int signalNumber) {
             close(fd);
         }
     }
-    signal(signalNumber, SIG_DFL);
+    struct sigaction restore {};
+    restore.sa_handler = SIG_DFL;
+    sigemptyset(&restore.sa_mask);
+    sigaction(signalNumber, &restore, nullptr);
     raise(signalNumber);
 }
 
 void installNativeCrashHandlers(const char *internalStorage) {
     snprintf(gCrashLogPath, sizeof(gCrashLogPath), "%s/native_crash_last.txt", internalStorage);
-    signal(SIGSEGV, nativeCrashHandler);
-    signal(SIGABRT, nativeCrashHandler);
-    signal(SIGBUS, nativeCrashHandler);
-    signal(SIGFPE, nativeCrashHandler);
-    signal(SIGILL, nativeCrashHandler);
+    gMainThreadTid = static_cast<pid_t>(syscall(__NR_gettid));
+
+    Dl_info moduleInfo {};
+    if (dladdr(reinterpret_cast<void *>(&installNativeCrashHandlers), &moduleInfo) != 0 &&
+        moduleInfo.dli_fbase != nullptr) {
+        gMainModuleBase = reinterpret_cast<uintptr_t>(moduleInfo.dli_fbase);
+    }
+
+    struct sigaction action {};
+    action.sa_sigaction = nativeCrashHandler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &action, nullptr);
+    sigaction(SIGABRT, &action, nullptr);
+    sigaction(SIGBUS, &action, nullptr);
+    sigaction(SIGFPE, &action, nullptr);
+    sigaction(SIGILL, &action, nullptr);
 }
 
 void logInfo(const char *message) { __android_log_print(ANDROID_LOG_INFO, LogTag, "%s", message); }
