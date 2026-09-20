@@ -9,10 +9,42 @@
 #include <android/log.h>
 #include <jni.h>
 #include <filesystem>
+#include <csignal>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
 #include <string>
 
 namespace {
 constexpr const char *LogTag = "OpenEngineSim";
+char gCrashLogPath[512] = {};
+volatile sig_atomic_t gCrashStage = 0;
+
+void nativeCrashHandler(int signalNumber) {
+    char buffer[256];
+    const int length = snprintf(buffer, sizeof(buffer),
+        "OPEN ENGINE SIM NATIVE CRASH\nsignal=%d\nstage=%d\n"
+        "stage 10=main loop, 20=post-load process, 30=post-load render, 40=audio callback\n",
+        signalNumber, static_cast<int>(gCrashStage));
+    if (gCrashLogPath[0] != '\0') {
+        const int fd = open(gCrashLogPath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            if (length > 0) write(fd, buffer, static_cast<size_t>(length));
+            close(fd);
+        }
+    }
+    signal(signalNumber, SIG_DFL);
+    raise(signalNumber);
+}
+
+void installNativeCrashHandlers(const char *internalStorage) {
+    snprintf(gCrashLogPath, sizeof(gCrashLogPath), "%s/native_crash_last.txt", internalStorage);
+    signal(SIGSEGV, nativeCrashHandler);
+    signal(SIGABRT, nativeCrashHandler);
+    signal(SIGBUS, nativeCrashHandler);
+    signal(SIGFPE, nativeCrashHandler);
+    signal(SIGILL, nativeCrashHandler);
+}
 
 void logInfo(const char *message) { __android_log_print(ANDROID_LOG_INFO, LogTag, "%s", message); }
 void logError(const char *stage, const char *error) {
@@ -68,6 +100,9 @@ int main(int, char **) {
         platform.shutdown();
         return 1;
     }
+
+    installNativeCrashHandlers(internalStorage);
+    gCrashStage = 10;
 
     RuntimePaths paths;
     paths.applicationDirectory = internalStorage;
