@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -148,6 +149,22 @@ public class OpenEngineSimActivity extends SDLActivity {
     private final Runnable hideDiagnosticsRunnable = () -> {
         if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
     };
+
+    public String writeMrLog(final String text) {
+        try {
+            final File documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
+            final File logDir = new File(documents, "OpenEngineSim/logs");
+            if (!logDir.mkdirs() && !logDir.isDirectory()) throw new IOException("Could not create " + logDir);
+            final String name = "mr_error_" + System.currentTimeMillis() + ".txt";
+            final File destination = new File(logDir, name);
+            Files.write(destination.toPath(), text.getBytes(StandardCharsets.UTF_8));
+            Log.i(TAG, "MR log saved: " + destination.getAbsolutePath());
+            return destination.getAbsolutePath();
+        } catch (Exception exception) {
+            Log.e(TAG, "Failed to write MR log", exception);
+            return "LOG SAVE FAILED: " + exception;
+        }
+    }
 
     public void showMrDiagnostics(final String status) {
         runOnUiThread(() -> {
