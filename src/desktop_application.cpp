@@ -16,7 +16,51 @@
 #include <filesystem>
 #include <fstream>
 
+#if defined(__ANDROID__)
+#include <SDL3/SDL.h>
+#include <jni.h>
+#endif
+
 namespace {
+#if defined(__ANDROID__)
+void openAndroidEnginePicker() {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "openEngineFilePicker", "()V") : nullptr;
+    if (method) env->CallVoidMethod(activity, method);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+}
+
+std::string consumeAndroidEngineSelection() {
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !activity) return {};
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "consumeSelectedEngineScript", "()Ljava/lang/String;") : nullptr;
+    if (!method) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (cls) env->DeleteLocalRef(cls);
+        return {};
+    }
+    jstring value = static_cast<jstring>(env->CallObjectMethod(activity, method));
+    std::string result;
+    if (value) {
+        const char *chars = env->GetStringUTFChars(value, nullptr);
+        if (chars) {
+            result = chars;
+            env->ReleaseStringUTFChars(value, chars);
+        }
+        env->DeleteLocalRef(value);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    return result;
+}
+#endif
+
 // Compose the engine below the camera origin independently of user pan state.
 constexpr float EngineViewCompositionOffsetY = -0.12f;
 }
@@ -140,6 +184,12 @@ bool EngineSimApplication::tick() {
 #endif
     }
     if (m_engineView != nullptr) m_uiManager.update(dt);
+#if defined(__ANDROID__)
+    if (m_pendingScriptPath.empty()) {
+        const std::string importedScript = consumeAndroidEngineSelection();
+        if (!importedScript.empty()) m_pendingScriptPath = importedScript;
+    }
+#endif
     if (!m_pendingScriptPath.empty()) {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
@@ -539,6 +589,15 @@ void EngineSimApplication::toggleFullscreen() {
 void EngineSimApplication::showControlsOverlay() { m_uiManager.showControlsOverlay(); }
 
 void EngineSimApplication::showEnginePickerOverlay() { m_uiManager.showEnginePickerOverlay(); }
+
+void EngineSimApplication::requestExternalEnginePicker() {
+#if defined(__ANDROID__)
+    openAndroidEnginePicker();
+    if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("Select an engine .mr file");
+#else
+    if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("External picker is available on Android");
+#endif
+}
 
 void EngineSimApplication::refreshUserInterface() {
     m_uiManager.destroy();
