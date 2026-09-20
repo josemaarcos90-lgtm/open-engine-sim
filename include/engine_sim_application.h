@@ -209,6 +209,7 @@ class EngineSimApplication {
         float m_lastProcessMs = 0.0f;
         float m_lastRenderMs = 0.0f;
         int m_postLoadProbeTicks = 0;
+        int m_postLoadTickNumber = 0;
         bool m_postLoadFirstProcessDone = false;
         bool m_postLoadFirstRenderDone = false;
 #endif
