@@ -6,6 +6,10 @@ import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.provider.MediaStore;
+import android.content.ContentValues;
+import android.content.ContentResolver;
+import android.os.Build;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Environment;
@@ -151,18 +155,34 @@ public class OpenEngineSimActivity extends SDLActivity {
     };
 
     public String writeMrLog(final String text) {
+        final String name = "mr_error_" + System.currentTimeMillis() + ".txt";
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH,
+                    Environment.DIRECTORY_DOCUMENTS + "/OpenEngineSim/logs");
+                ContentResolver resolver = getContentResolver();
+                Uri uri = resolver.insert(MediaStore.Files.getContentUri("external"), values);
+                if (uri == null) throw new IOException("MediaStore insert returned null");
+                try (java.io.OutputStream output = resolver.openOutputStream(uri, "w")) {
+                    if (output == null) throw new IOException("Could not open MediaStore output");
+                    output.write(text.getBytes(StandardCharsets.UTF_8));
+                    output.flush();
+                }
+                return "Documentos/OpenEngineSim/logs/" + name;
+            }
+
             final File documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
             final File logDir = new File(documents, "OpenEngineSim/logs");
             if (!logDir.mkdirs() && !logDir.isDirectory()) throw new IOException("Could not create " + logDir);
-            final String name = "mr_error_" + System.currentTimeMillis() + ".txt";
             final File destination = new File(logDir, name);
             Files.write(destination.toPath(), text.getBytes(StandardCharsets.UTF_8));
-            Log.i(TAG, "MR log saved: " + destination.getAbsolutePath());
             return destination.getAbsolutePath();
         } catch (Exception exception) {
             Log.e(TAG, "Failed to write MR log", exception);
-            return "LOG SAVE FAILED: " + exception;
+            return "LOG SAVE FAILED: " + exception.getClass().getSimpleName() + ": " + exception.getMessage();
         }
     }
 
