@@ -833,6 +833,10 @@ void EngineSimApplication::refreshUserInterface() {
 }
 void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmission *transmission) {
 #if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 01 stop audio");
+#endif
+
+#if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 1/10 | parando audio antigo");
 #endif
     if (m_audioOutput != nullptr) m_audioOutput->stop();
@@ -841,10 +845,22 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // destruction and crash on Android.
     if (m_simulator != nullptr) m_simulator->endAudioRenderingThread();
 #if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 02 old audio worker stopped");
+#endif
+
+#if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 2/10 | audio antigo parado; destruindo UI/objetos");
 #endif
     destroyObjects();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 03 old scene objects destroyed");
+#endif
+
     m_uiManager.destroy();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 04 old UI destroyed");
+#endif
+
     m_engineView = nullptr;
     m_rightGaugeCluster = nullptr;
     m_oscCluster = nullptr;
@@ -853,7 +869,15 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     m_mixerCluster = nullptr;
     m_infoCluster = nullptr;
     if (m_simulator != nullptr) { m_simulator->releaseSimulation(); delete m_simulator; }
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 05 old simulator released");
+#endif
+
     if (m_iceEngine != nullptr) { m_iceEngine->destroy(); delete m_iceEngine; }
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 06 old engine destroyed");
+#endif
+
     delete m_vehicle;
     delete m_transmission;
     // The transmission object starts in neutral, but these controls belong to
@@ -882,12 +906,23 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 4/10 | criando Simulator");
 #endif
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 07 creating simulator");
+#endif
     m_simulator = engine->createSimulator(vehicle, transmission, outputAudioSampleRate);
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 08 simulator created");
+#endif
+
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 5/10 | Simulator criado; configurando simulacao");
 #endif
     m_viewParameters.Layer1 = engine->getMaxDepth();
     engine->calculateDisplacement();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 09 displacement calculated");
+#endif
+
 #if defined(__ANDROID__)
     // Mobile performance mode. Physics cost scales almost linearly with this
     // frequency (and cylinder count). 2 kHz was audibly coarse in earlier
@@ -920,16 +955,41 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 7/10 | impulse responses OK; iniciando thread de audio");
 #endif
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 10 impulse responses loaded; starting synth worker");
+#endif
     m_simulator->startAudioRenderingThread();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 11 synth worker started");
+#endif
+
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 8/10 | thread de audio OK; iniciando saida SDL");
 #endif
     if (m_audioOutput != nullptr) m_audioOutput->start(m_simulator);
 #if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 12 SDL audio started");
+#endif
+
+#if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 9/10 | audio SDL OK; criando objetos visuais");
 #endif
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 13 creating scene objects");
+#endif
     createObjects(engine);
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 14 scene objects created");
+#endif
+
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 15 rebuilding UI");
+#endif
     refreshUserInterface();
+#if defined(__ANDROID__)
+    checkpointAndroidMr("LOAD ENGINE | 16 load complete");
+#endif
+
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 10/10 | UI pronta");
 #endif
