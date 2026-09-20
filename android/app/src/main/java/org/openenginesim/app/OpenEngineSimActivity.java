@@ -31,7 +31,7 @@ import java.nio.file.Files;
 public class OpenEngineSimActivity extends SDLActivity {
     private static final String TAG = "OpenEngineSim";
     private static final int ENGINE_FILE_REQUEST = 4107;
-    private static final String ASSET_VERSION = "0.2.2-android-alpha4";
+    private static final String ASSET_VERSION = "0.2.2-android-alpha39";
     private TextView diagnosticView;
     private String assetStatus = "ASSETS: AINDA NAO VERIFICADOS";
     private volatile String pendingEngineScript = "";
@@ -263,10 +263,39 @@ public class OpenEngineSimActivity extends SDLActivity {
             final String installedVersion = new String(Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8).trim();
             if (ASSET_VERSION.equals(installedVersion)) return;
         }
-        deleteRecursively(destinationRoot);
-        if (!destinationRoot.mkdirs() && !destinationRoot.isDirectory()) throw new IOException("Could not create " + destinationRoot);
-        copyAssetTree(getAssets(), "", destinationRoot);
-        Files.write(marker.toPath(), ASSET_VERSION.getBytes(StandardCharsets.UTF_8));
+        // User imports live below the extracted asset tree so Piranha can
+        // resolve their normal relative imports. Preserve that directory when
+        // packaged assets need to be refreshed after an app update.
+        final File userEngines = new File(destinationRoot, "engines/user");
+        final File userBackup = new File(getFilesDir(), "user-engines-backup");
+        deleteRecursively(userBackup);
+        final boolean hadUserEngines = userEngines.isDirectory();
+        if (hadUserEngines && !userEngines.renameTo(userBackup)) {
+            throw new IOException("Could not preserve imported engines before asset refresh");
+        }
+
+        try {
+            deleteRecursively(destinationRoot);
+            if (!destinationRoot.mkdirs() && !destinationRoot.isDirectory()) throw new IOException("Could not create " + destinationRoot);
+            copyAssetTree(getAssets(), "", destinationRoot);
+
+            if (hadUserEngines) {
+                final File restoredParent = userEngines.getParentFile();
+                if (restoredParent != null && !restoredParent.mkdirs() && !restoredParent.isDirectory()) {
+                    throw new IOException("Could not recreate imported-engine directory");
+                }
+                if (!userBackup.renameTo(userEngines)) {
+                    throw new IOException("Could not restore imported engines after asset refresh");
+                }
+            }
+
+            Files.write(marker.toPath(), ASSET_VERSION.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException exception) {
+            // If refresh failed after the backup was made, keep the user's
+            // imported files in the backup rather than deleting them.
+            Log.e(TAG, "Asset refresh failed; preserved user engines at " + userBackup, exception);
+            throw exception;
+        }
     }
 
     private static void copyAssetTree(AssetManager manager, String assetPath, File destination) throws IOException {
