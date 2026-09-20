@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 32
-        versionName '0.2.2-android-alpha35-postload-window'
+        versionCode 33
+        versionName '0.2.2-android-alpha36-boundary-trace'
 
         ndk {
             abiFilters 'arm64-v8a'
