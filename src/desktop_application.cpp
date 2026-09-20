@@ -491,9 +491,20 @@ bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
     bool loaded = compileEntry(scriptPath);
     std::filesystem::path generatedEntryPoint;
     if (!loaded && relativeScriptPath != "main.mr") {
+#if defined(__ANDROID__)
+        // Keep the wrapper inside the compiler's asset root and import using
+        // the same asset-relative syntax as every bundled engine. Piranha's
+        // Android file resolver is rooted at m_assetPath; feeding it a cache
+        // file that imports an absolute /data/user/... path makes valid
+        // external scripts fail before main() can be executed.
+        generatedEntryPoint = std::filesystem::path(m_assetPath) / "user-engine-entry.mr";
+        std::ofstream entryPoint(generatedEntryPoint);
+        entryPoint << "import \"" << relativeScriptPath << "\"\n\nmain()\n";
+#else
         generatedEntryPoint = std::filesystem::temp_directory_path() / "engine-sim-picker-entry.mr";
         std::ofstream entryPoint(generatedEntryPoint);
         entryPoint << "import \"" << scriptPath.generic_string() << "\"\n\nmain()\n";
+#endif
         entryPoint.close();
         loaded = compileEntry(generatedEntryPoint);
     }
