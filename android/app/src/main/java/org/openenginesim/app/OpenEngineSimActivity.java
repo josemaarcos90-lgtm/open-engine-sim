@@ -49,6 +49,7 @@ public class OpenEngineSimActivity extends SDLActivity {
             assetStatus = "ASSETS: FALHOU\n" + exception;
         }
         super.onCreate(savedInstanceState);
+        publishPendingNativeCrash();
         updateNativeStatus("Aguardando entrada no codigo C++...");
     }
 
@@ -153,6 +154,19 @@ public class OpenEngineSimActivity extends SDLActivity {
     private final Runnable hideDiagnosticsRunnable = () -> {
         if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
     };
+
+    private void publishPendingNativeCrash() {
+        final File crash = new File(getFilesDir(), "native_crash_last.txt");
+        if (!crash.isFile()) return;
+        try {
+            final String text = new String(Files.readAllBytes(crash.toPath()), StandardCharsets.UTF_8);
+            final String published = writeMrLog(text);
+            Log.e(TAG, "Recovered native crash report: " + published);
+            crash.delete();
+        } catch (Exception exception) {
+            Log.e(TAG, "Failed to publish native crash report", exception);
+        }
+    }
 
     public void checkpointMrLog(final String text) {
         try {
