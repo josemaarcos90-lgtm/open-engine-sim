@@ -62,9 +62,17 @@ public class OpenEngineSimActivity extends SDLActivity {
             diagnosticView.setTextColor(Color.GREEN);
             diagnosticView.setTextSize(15.0f);
             diagnosticView.setVisibility(View.VISIBLE);
-            diagnosticView.setText("OPEN ENGINE SIM - RENDER DIAGNOSTICO V4\n\n" + renderStatus);
+            diagnosticView.setText("OPEN ENGINE SIM - RENDER DIAGNOSTICO V5\n\n" + renderStatus);
+            // Keep the diagnostic visible long enough to photograph, then reveal
+            // the SDL/GPU surface automatically for the actual visual test.
+            diagnosticView.removeCallbacks(hideDiagnosticsRunnable);
+            diagnosticView.postDelayed(hideDiagnosticsRunnable, 2500);
         });
     }
+
+    private final Runnable hideDiagnosticsRunnable = () -> {
+        if (diagnosticView != null) diagnosticView.setVisibility(View.GONE);
+    };
 
     public void hideNativeDiagnostics() {
         runOnUiThread(() -> {
