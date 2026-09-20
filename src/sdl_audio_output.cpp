@@ -40,6 +40,11 @@ bool SdlAudioOutput::start(Simulator *simulator) {
 }
 
 void SdlAudioOutput::audioThread() {
+#if defined(__ANDROID__)
+    // Prefer the device-feeding thread over visual work during CPU spikes.
+    // Failure is harmless; SDL simply leaves the platform priority unchanged.
+    SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+#endif
     while (m_running) {
         fillStream();
         if (m_diagnostics) {
