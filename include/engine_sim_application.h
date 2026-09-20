@@ -208,6 +208,9 @@ class EngineSimApplication {
         bool m_externalEnginePickerPending = false;
         float m_lastProcessMs = 0.0f;
         float m_lastRenderMs = 0.0f;
+        int m_postLoadProbeTicks = 0;
+        bool m_postLoadFirstProcessDone = false;
+        bool m_postLoadFirstRenderDone = false;
 #endif
 
 #ifdef ATG_ENGINE_SIM_VIDEO_CAPTURE
