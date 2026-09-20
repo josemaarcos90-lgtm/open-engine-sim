@@ -190,6 +190,11 @@ bool Synthesizer::pumpAudioRendering() {
         parameters = m_audioParameters;
     }
     std::lock_guard<std::mutex> renderLock(m_renderLock);
+    // These parameters are constant for the whole rendered block. Updating the
+    // leveler once here avoids three stores for every 44.1 kHz output sample.
+    m_levelingFilter.p_target = parameters.levelerTarget;
+    m_levelingFilter.p_maxLevel = parameters.levelerMaxGain;
+    m_levelingFilter.p_minLevel = parameters.levelerMinGain;
     for (int i = 0; i < m_inputChannelCount; ++i) {
         m_filters[i].airNoiseLowPass.setCutoffFrequency(
             static_cast<float>(parameters.airNoiseFrequencyCutoff), m_audioSampleRate);
@@ -380,6 +385,11 @@ void Synthesizer::renderAudio() {
         parameters = m_audioParameters;
     }
     std::lock_guard<std::mutex> renderLock(m_renderLock);
+    // These parameters are constant for the whole rendered block. Updating the
+    // leveler once here avoids three stores for every 44.1 kHz output sample.
+    m_levelingFilter.p_target = parameters.levelerTarget;
+    m_levelingFilter.p_maxLevel = parameters.levelerMaxGain;
+    m_levelingFilter.p_minLevel = parameters.levelerMinGain;
     for (int i = 0; i < m_inputChannelCount; ++i) {
         m_filters[i].airNoiseLowPass.setCutoffFrequency(
             static_cast<float>(parameters.airNoiseFrequencyCutoff), m_audioSampleRate);
@@ -483,9 +493,6 @@ int16_t Synthesizer::renderAudio(int inputSample, const AudioParameters &paramet
 
     signal = m_antialiasing.fast_f(signal);
 
-    m_levelingFilter.p_target = parameters.levelerTarget;
-    m_levelingFilter.p_maxLevel = parameters.levelerMaxGain;
-    m_levelingFilter.p_minLevel = parameters.levelerMinGain;
     const float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
     int r_int = std::lround(v_leveled);
     if (r_int > INT16_MAX) {
