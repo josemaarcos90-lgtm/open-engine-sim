@@ -427,47 +427,54 @@ void EngineSimApplication::requestEngineScript(const std::string &relativeScript
 
 bool EngineSimApplication::loadScript(const std::string &relativeScriptPath) {
 #if defined(ATG_ENGINE_SIM_PIRANHA_ENABLED)
-    es_script::Compiler compiler;
-    compiler.initialize(m_assetPath);
     Engine *engine = nullptr;
     Vehicle *vehicle = nullptr;
     Transmission *transmission = nullptr;
-    std::filesystem::path scriptPath = std::filesystem::path(m_assetPath) / relativeScriptPath;
-    std::filesystem::path entryPointPath = scriptPath;
+    const std::filesystem::path scriptPath = std::filesystem::path(m_assetPath) / relativeScriptPath;
 #if defined(__ANDROID__)
     if (!std::filesystem::exists(scriptPath)) {
         if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR missing: " + scriptPath.string());
-        compiler.destroy();
         return false;
     }
 #endif
+
+    // External .mr files come in two common forms:
+    //  1) complete entry points that already call main();
+    //  2) engine modules that only define public node main (catalog style).
+    // Try the file exactly as authored first. If it does not produce the three
+    // simulator objects, fall back to the catalog wrapper used by packaged engines.
+    auto compileEntry = [&](const std::filesystem::path &entryPoint) -> bool {
+        es_script::Compiler compiler;
+        compiler.initialize(m_assetPath);
+        const bool compiled = compiler.compile(entryPoint.string());
+        if (compiled) {
+            const es_script::Compiler::Output output = compiler.execute();
+            if (output.engine != nullptr && output.vehicle != nullptr && output.transmission != nullptr) {
+                configure(output.applicationSettings);
+                engine = output.engine;
+                vehicle = output.vehicle;
+                transmission = output.transmission;
+            }
+        }
+        compiler.destroy();
+        return engine != nullptr && vehicle != nullptr && transmission != nullptr;
+    };
+
+    bool loaded = compileEntry(scriptPath);
     std::filesystem::path generatedEntryPoint;
-    // Engine files define public node main but do not invoke it. The normal
-    // main.mr does exactly that after importing an engine, so create the same
-    // tiny entry point in the temporary filesystem for a selected catalog item.
-    if (relativeScriptPath != "main.mr") {
+    if (!loaded && relativeScriptPath != "main.mr") {
         generatedEntryPoint = std::filesystem::temp_directory_path() / "engine-sim-picker-entry.mr";
         std::ofstream entryPoint(generatedEntryPoint);
         entryPoint << "import \"" << scriptPath.generic_string() << "\"\n\nmain()\n";
         entryPoint.close();
-        entryPointPath = generatedEntryPoint;
+        loaded = compileEntry(generatedEntryPoint);
     }
-    const bool compiled = compiler.compile(entryPointPath.string());
-    if (compiled) {
-        const es_script::Compiler::Output output = compiler.execute();
-        configure(output.applicationSettings);
-        engine = output.engine;
-        vehicle = output.vehicle;
-        transmission = output.transmission;
-    }
-    compiler.destroy();
     if (!generatedEntryPoint.empty()) {
         std::error_code ignored;
         std::filesystem::remove(generatedEntryPoint, ignored);
     }
-    // A failed hot reload must leave the currently running simulation intact;
-    // otherwise a transient file error turns Return into a destructive reset.
-    if (engine != nullptr && vehicle != nullptr && transmission != nullptr) {
+
+    if (loaded) {
         loadEngine(engine, vehicle, transmission);
         return true;
     }
