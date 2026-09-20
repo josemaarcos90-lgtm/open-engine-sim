@@ -76,9 +76,10 @@ bool WebGlRenderer::initialize(SDL_Window *window) {
         shutdown();
         return false;
     }
+    glGenVertexArrays(1, &m_vertexArray);
     glGenBuffers(1, &m_vertexBuffer);
     glGenBuffers(1, &m_indexBuffer);
-    if (m_vertexBuffer == 0 || m_indexBuffer == 0) {
+    if (m_vertexArray == 0 || m_vertexBuffer == 0 || m_indexBuffer == 0) {
         m_error = "WebGL buffer allocation failed";
         shutdown();
         return false;
@@ -88,6 +89,7 @@ bool WebGlRenderer::initialize(SDL_Window *window) {
 
 void WebGlRenderer::shutdown() {
     if (m_context != nullptr) {
+        if (m_vertexArray != 0) glDeleteVertexArrays(1, &m_vertexArray);
         if (m_vertexBuffer != 0) glDeleteBuffers(1, &m_vertexBuffer);
         if (m_indexBuffer != 0) glDeleteBuffers(1, &m_indexBuffer);
         if (m_program != 0) glDeleteProgram(m_program);
@@ -96,8 +98,11 @@ void WebGlRenderer::shutdown() {
     m_context = nullptr;
     m_window = nullptr;
     m_program = 0;
+    m_vertexArray = 0;
     m_vertexBuffer = 0;
     m_indexBuffer = 0;
+    m_vertexCapacityBytes = 0;
+    m_indexCapacityBytes = 0;
 }
 
 const char *WebGlRenderer::lastError() const {
@@ -171,13 +176,11 @@ void WebGlRenderer::submitGeometry(const EngineSimVertex *, const std::uint16_t 
 }
 
 void WebGlRenderer::drawStage(std::uint32_t stage) {
-    std::vector<const Submission *> submissions;
-    for (const Submission &submission : m_submissions) {
-        if ((submission.stage & stage) != 0) submissions.push_back(&submission);
-    }
-    std::stable_sort(submissions.begin(), submissions.end(),
-        [](const Submission *left, const Submission *right) { return left->layer < right->layer; });
-    for (const Submission *submission : submissions) {
+    // Submissions are emitted in layer order by the application. Avoid allocating
+    // and stable-sorting hundreds of pointers every stage/frame on mobile.
+    for (const Submission &entry : m_submissions) {
+        if ((entry.stage & stage) == 0) continue;
+        const Submission *submission = &entry;
         // Object transforms are stored in the layout expected by the HLSL
         // row-vector path. Camera and projection matrices have already been
         // transposed for that path, so transpose them back before WebGL reads
@@ -221,12 +224,21 @@ void WebGlRenderer::endFrame() {
 
     if (m_vertexCount > 0 && m_indexCount > 0) {
         glUseProgram(m_program);
+        glBindVertexArray(m_vertexArray);
         glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(EngineSimVertex) * m_vertexCount),
-            m_vertices, GL_DYNAMIC_DRAW);
+        const std::size_t vertexBytes = sizeof(EngineSimVertex) * static_cast<std::size_t>(m_vertexCount);
+        if (vertexBytes > m_vertexCapacityBytes) {
+            m_vertexCapacityBytes = std::max(vertexBytes, m_vertexCapacityBytes * 2);
+            glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_vertexCapacityBytes), nullptr, GL_STREAM_DRAW);
+        }
+        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(vertexBytes), m_vertices);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(std::uint16_t) * m_indexCount),
-            m_indices, GL_DYNAMIC_DRAW);
+        const std::size_t indexBytes = sizeof(std::uint16_t) * static_cast<std::size_t>(m_indexCount);
+        if (indexBytes > m_indexCapacityBytes) {
+            m_indexCapacityBytes = std::max(indexBytes, m_indexCapacityBytes * 2);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_indexCapacityBytes), nullptr, GL_STREAM_DRAW);
+        }
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(indexBytes), m_indices);
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
@@ -252,6 +264,7 @@ void WebGlRenderer::endFrame() {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         drawStage(Shaders::UiStage);
         glDisable(GL_BLEND);
+        glBindVertexArray(0);
     }
     SDL_GL_SwapWindow(m_window);
 }
