@@ -196,17 +196,20 @@ bool EngineSimApplication::tick() {
         if (!importedScript.empty()) {
             m_pendingScriptPath = importedScript;
             m_externalEnginePickerPending = false;
-            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);\n            m_mrDiagnosticUntilTick = now + 15000;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR selected: " + importedScript);
+            m_mrDiagnosticUntilTick = now + 15000;
         }
     }
 #endif
     if (!m_pendingScriptPath.empty()) {
         const std::string selectedScript = m_pendingScriptPath;
         m_pendingScriptPath.clear();
-        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);\n        m_mrDiagnosticUntilTick = now + 15000;
+        if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loading: " + selectedScript);
+        m_mrDiagnosticUntilTick = now + 15000;
         if (loadScript(selectedScript)) {
             m_currentScriptPath = selectedScript;
-            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);\n            m_mrDiagnosticUntilTick = now + 15000;
+            if (m_infoCluster != nullptr) m_infoCluster->setLogMessage("MR loaded: " + selectedScript);
+            m_mrDiagnosticUntilTick = now + 15000;
         }
     }
     // Rendering is substantially more expensive than the audio-producing
