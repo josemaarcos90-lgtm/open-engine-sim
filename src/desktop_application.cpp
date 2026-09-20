@@ -109,7 +109,14 @@ bool EngineSimApplication::tick() {
     const std::uint64_t now = m_platform->ticks();
         // Drive physics from elapsed time so synthesis remains in step with
         // wall time and does not accumulate audio latency.
+    #if defined(__ANDROID__)
+    // Do not let a slow render frame create a simulation spiral: once a frame
+    // takes longer, feeding all of that wall time back into physics makes the
+    // next frame even more expensive. Keep audio/physics real-time sized.
+    const float dt = std::min(static_cast<float>(now - m_lastTick) / 1000.0f, 1.0f / 30.0f);
+#else
     const float dt = std::min(static_cast<float>(now - m_lastTick) / 1000.0f, 0.25f);
+#endif
     m_lastTick = now;
     if (dt > 0.0f) {
         m_averageFramerate = 0.9f * m_averageFramerate + 0.1f / dt;
