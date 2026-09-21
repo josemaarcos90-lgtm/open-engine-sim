@@ -33,7 +33,7 @@ Synthesizer::Synthesizer() {
     m_dspJumpPeak = 0;
     m_dspPreviousSample = 0;
     m_dspHasPreviousSample = false;
-    m_androidOutputGain = 1.0f;
+
 
     m_inputSampleRate = 0.0;
     m_audioSampleRate = 0.0;
@@ -173,7 +173,7 @@ bool Synthesizer::pumpAudioRendering() {
 
     #if defined(__ANDROID__)
     // Give the convolution worker enough PCM headroom to survive CPU spikes.
-    constexpr int outputLeadSamples = 8192;
+    constexpr int outputLeadSamples = 16384;
 #else
     constexpr int outputLeadSamples = 1024;
 #endif
@@ -199,13 +199,8 @@ bool Synthesizer::pumpAudioRendering() {
     // These parameters are constant for the whole rendered block. Updating the
     // leveler once here avoids three stores for every 44.1 kHz output sample.
 #if defined(__ANDROID__)
-    // The leveler works before the user volume multiplier. At 200% volume the
-    // old 30000 target could therefore demand ~60000 from a 16-bit output and
-    // clip every strong exhaust pulse. Reserve 5% headroom after volume.
-    const float safeVolume = std::max(0.001f, std::abs(parameters.volume));
-    m_levelingFilter.p_target = std::min(
-        parameters.levelerTarget,
-        (0.95f * static_cast<float>(INT16_MAX)) / safeVolume);
+    const float safeVolume = std::max(1.0f, std::abs(parameters.volume));
+    m_levelingFilter.p_target = std::min(parameters.levelerTarget, 22000.0f / safeVolume);
 #else
     m_levelingFilter.p_target = parameters.levelerTarget;
 #endif
@@ -371,7 +366,7 @@ void Synthesizer::renderAudio() {
     // queue without adding a perceptible control-to-sound delay.
     #if defined(__ANDROID__)
     // Give the convolution worker enough PCM headroom to survive CPU spikes.
-    constexpr int outputLeadSamples = 8192;
+    constexpr int outputLeadSamples = 16384;
 #else
     constexpr int outputLeadSamples = 1024;
 #endif
@@ -406,13 +401,8 @@ void Synthesizer::renderAudio() {
     // These parameters are constant for the whole rendered block. Updating the
     // leveler once here avoids three stores for every 44.1 kHz output sample.
 #if defined(__ANDROID__)
-    // The leveler works before the user volume multiplier. At 200% volume the
-    // old 30000 target could therefore demand ~60000 from a 16-bit output and
-    // clip every strong exhaust pulse. Reserve 5% headroom after volume.
-    const float safeVolume = std::max(0.001f, std::abs(parameters.volume));
-    m_levelingFilter.p_target = std::min(
-        parameters.levelerTarget,
-        (0.95f * static_cast<float>(INT16_MAX)) / safeVolume);
+    const float safeVolume = std::max(1.0f, std::abs(parameters.volume));
+    m_levelingFilter.p_target = std::min(parameters.levelerTarget, 22000.0f / safeVolume);
 #else
     m_levelingFilter.p_target = parameters.levelerTarget;
 #endif
@@ -528,25 +518,12 @@ int16_t Synthesizer::renderAudio(int inputSample, const AudioParameters &paramet
 
     float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
 #if defined(__ANDROID__)
-    // Last-stage peak guard. Unlike Alpha48's soft-knee experiment, this is a
-    // gain controller: it attacks only when a sample would exceed the digital
-    // ceiling and releases slowly, so it cannot create a flat-topped waveform.
-    constexpr float pcmCeiling = 0.95f * static_cast<float>(INT16_MAX);
-    if (!std::isfinite(v_leveled)) v_leveled = 0.0f;
-    const float magnitude = std::abs(v_leveled);
-    const float requiredGain = magnitude > pcmCeiling ? pcmCeiling / magnitude : 1.0f;
-    if (requiredGain < m_androidOutputGain) {
-        m_androidOutputGain = requiredGain;
-    }
-    else {
-        // ~80 ms release: inaudible on individual combustion pulses and avoids
-        // pumping between consecutive cylinders.
-        m_androidOutputGain += (1.0f - m_androidOutputGain)
-            * (1.0f - std::exp(-1.0f / (0.080f * m_audioSampleRate)));
-    }
-    v_leveled *= m_androidOutputGain;
+    // Mobile output is intentionally conservative. The old adaptive gain stage
+    // could move rapidly around combustion transients; fixed headroom preserves
+    // waveform continuity and leaves the Android mixer room to work.
+    v_leveled *= 0.72f;
 #endif
-    int r_int = std::lround(v_leveled);
+        int r_int = std::lround(v_leveled);
     if (r_int > INT16_MAX) r_int = INT16_MAX;
     else if (r_int < INT16_MIN) r_int = INT16_MIN;
 
