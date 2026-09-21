@@ -36,6 +36,10 @@ private:
     std::atomic<std::uint64_t> m_underrunEvents = 0;
     std::atomic<std::uint64_t> m_clipEvents = 0;
     std::uint64_t m_lastVisualDiagnosticTick = 0;
+    std::uint64_t m_lastCallbackTick = 0;
+    std::uint64_t m_worstCallbackGap = 0;
+    std::uint64_t m_worstFillTime = 0;
+    std::uint64_t m_worstPutTime = 0;
 };
 
 #endif
