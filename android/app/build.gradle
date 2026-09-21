@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 44
-        versionName '0.2.2-android-alpha46-audio-first-scheduler'
+        versionCode 45
+        versionName '0.2.2-android-alpha48-soft-limiter'
 
         ndk {
             abiFilters 'arm64-v8a'
