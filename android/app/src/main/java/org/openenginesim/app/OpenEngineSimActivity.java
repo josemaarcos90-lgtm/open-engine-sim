@@ -34,6 +34,7 @@ public class OpenEngineSimActivity extends SDLActivity {
     private static final String ASSET_VERSION = "0.2.2-android-alpha39";
     private TextView diagnosticView;
     private TextView portCreditView;
+    private TextView audioGlitchView;
     private String assetStatus = "ASSETS: AINDA NAO VERIFICADOS";
     private volatile String pendingEngineScript = "";
 
@@ -78,6 +79,32 @@ public class OpenEngineSimActivity extends SDLActivity {
             portCreditView.setVisibility(View.VISIBLE);
         });
     }
+
+    public void showAudioGlitch(final String status) {
+        runOnUiThread(() -> {
+            if (audioGlitchView == null) {
+                audioGlitchView = new TextView(this);
+                audioGlitchView.setTextColor(Color.WHITE);
+                audioGlitchView.setBackgroundColor(0xD9B00020);
+                audioGlitchView.setTextSize(15.0f);
+                audioGlitchView.setGravity(Gravity.CENTER);
+                audioGlitchView.setPadding(18, 8, 18, 8);
+                addContentView(audioGlitchView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                audioGlitchView.setX(24.0f);
+                audioGlitchView.setY(24.0f);
+            }
+            audioGlitchView.removeCallbacks(hideAudioGlitchRunnable);
+            audioGlitchView.setText("AUDIO: " + status);
+            audioGlitchView.bringToFront();
+            audioGlitchView.setVisibility(View.VISIBLE);
+            audioGlitchView.postDelayed(hideAudioGlitchRunnable, 320);
+        });
+    }
+
+    private final Runnable hideAudioGlitchRunnable = () -> {
+        if (audioGlitchView != null) audioGlitchView.setVisibility(View.GONE);
+    };
 
     public void openEngineFilePicker() {
         runOnUiThread(() -> {
