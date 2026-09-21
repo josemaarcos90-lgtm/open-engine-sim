@@ -33,6 +33,10 @@ bool SdlAudioOutput::start(Simulator *simulator) {
     m_underrunEvents.store(0);
     m_clipEvents.store(0);
     m_lastVisualDiagnosticTick = 0;
+    m_lastCallbackTick = 0;
+    m_worstCallbackGap = 0;
+    m_worstFillTime = 0;
+    m_worstPutTime = 0;
     if (m_diagnostics) {
         SDL_AudioSpec source = {}, destination = {};
         if (SDL_GetAudioStreamFormat(m_stream, &source, &destination)) {
@@ -54,6 +58,13 @@ void SDLCALL SdlAudioOutput::audioCallback(
     auto *output = static_cast<SdlAudioOutput *>(userdata);
     if (output == nullptr) return;
     output->m_callbacksInFlight.fetch_add(1, std::memory_order_acq_rel);
+#if defined(__ANDROID__)
+    const std::uint64_t callbackNow = SDL_GetTicks();
+    const std::uint64_t callbackGap = output->m_lastCallbackTick == 0
+        ? 0 : callbackNow - output->m_lastCallbackTick;
+    output->m_lastCallbackTick = callbackNow;
+    output->m_worstCallbackGap = std::max(output->m_worstCallbackGap, callbackGap);
+#endif
     if (output->m_running.load(std::memory_order_acquire) &&
         output->m_simulator != nullptr && additionalAmount > 0) {
         output->fillStream(stream, additionalAmount);
@@ -63,6 +74,9 @@ void SDLCALL SdlAudioOutput::audioCallback(
 
 void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     if (stream == nullptr || m_simulator == nullptr || requestedBytes <= 0) return;
+#if defined(__ANDROID__)
+    const std::uint64_t fillStartTick = SDL_GetTicks();
+#endif
 
 #if defined(__ANDROID__)
     constexpr int chunkFrames = 2048;
@@ -83,7 +97,14 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     while (remainingBytes > 0) {
         const int frames = std::min(chunkFrames,
             (remainingBytes + bytesPerFrame - 1) / bytesPerFrame);
+#if defined(__ANDROID__)
+        const std::uint64_t readStartTick = SDL_GetTicks();
+#endif
         const int pcmFrames = m_simulator->readAudioOutput(frames, samples.data());
+#if defined(__ANDROID__)
+        const std::uint64_t readTime = SDL_GetTicks() - readStartTick;
+        m_worstFillTime = std::max(m_worstFillTime, readTime);
+#endif
         const int validFrames = std::max(0, pcmFrames);
         m_pcmFrames += validFrames;
         m_silenceFrames += frames - validFrames;
@@ -146,9 +167,57 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
 #endif
 
         const int bytes = frames * bytesPerFrame;
+#if defined(__ANDROID__)
+        const std::uint64_t putStartTick = SDL_GetTicks();
+#endif
         if (!SDL_PutAudioStreamData(stream, samples.data(), bytes)) return;
+#if defined(__ANDROID__)
+        const std::uint64_t putTime = SDL_GetTicks() - putStartTick;
+        m_worstPutTime = std::max(m_worstPutTime, putTime);
+#endif
         remainingBytes -= bytes;
     }
+
+#if defined(__ANDROID__)
+    const std::uint64_t fillTotal = SDL_GetTicks() - fillStartTick;
+    // Report scheduling/SDL stalls even when PCM itself is perfectly valid.
+    // Hold the worst measurements until displayed so a sub-second spike is not lost.
+    const bool callbackStall = m_worstCallbackGap >= 35;
+    const bool readStall = m_worstFillTime >= 10;
+    const bool putStall = m_worstPutTime >= 10;
+    const bool fillStall = fillTotal >= 20;
+    if (callbackStall || readStall || putStall || fillStall) {
+        const std::uint64_t now = SDL_GetTicks();
+        if (now - m_lastVisualDiagnosticTick >= 180) {
+            m_lastVisualDiagnosticTick = now;
+            JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+            jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+            if (env != nullptr && activity != nullptr) {
+                jclass cls = env->GetObjectClass(activity);
+                if (cls != nullptr) {
+                    jmethodID method = env->GetMethodID(cls, "showAudioGlitch", "(Ljava/lang/String;)V");
+                    if (method != nullptr) {
+                        char diagnostic[192];
+                        std::snprintf(diagnostic, sizeof(diagnostic),
+                            "STALL CB %llums READ %llums PUT %llums TOTAL %llums",
+                            static_cast<unsigned long long>(m_worstCallbackGap),
+                            static_cast<unsigned long long>(m_worstFillTime),
+                            static_cast<unsigned long long>(m_worstPutTime),
+                            static_cast<unsigned long long>(fillTotal));
+                        jstring text = env->NewStringUTF(diagnostic);
+                        env->CallVoidMethod(activity, method, text);
+                        env->DeleteLocalRef(text);
+                    }
+                    if (env->ExceptionCheck()) env->ExceptionClear();
+                    env->DeleteLocalRef(cls);
+                }
+            }
+            m_worstCallbackGap = 0;
+            m_worstFillTime = 0;
+            m_worstPutTime = 0;
+        }
+    }
+#endif
 
     if (m_diagnostics) {
         const std::uint64_t now = SDL_GetTicks();
