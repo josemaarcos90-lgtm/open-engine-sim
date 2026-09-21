@@ -225,10 +225,12 @@ bool EngineSimApplication::tick() {
         // Drive physics from elapsed time so synthesis remains in step with
         // wall time and does not accumulate audio latency.
     #if defined(__ANDROID__)
-    // Do not let a slow render frame create a simulation spiral: once a frame
-    // takes longer, feeding all of that wall time back into physics makes the
-    // next frame even more expensive. Keep audio/physics real-time sized.
-    const float dt = std::min(static_cast<float>(now - m_lastTick) / 1000.0f, 1.0f / 30.0f);
+    // Do not throw away elapsed wall time after a slow render. The old 33 ms
+    // clamp permanently under-produced synthesizer input whenever a frame took
+    // longer than 33 ms, which eventually forced the SDL callback to insert
+    // silence (the audible crackle). Allow bounded catch-up; the audio-first
+    // render guard below will skip presentation while the reservoir recovers.
+    const float dt = std::min(static_cast<float>(now - m_lastTick) / 1000.0f, 0.10f);
 #else
     const float dt = std::min(static_cast<float>(now - m_lastTick) / 1000.0f, 0.25f);
 #endif
@@ -346,7 +348,7 @@ bool EngineSimApplication::tick() {
     // physics/input production immediately, allowing audio to recover without
     // changing simulation frequency or sound quality.
     if (m_simulator != nullptr) {
-        constexpr double audioRenderGuardSeconds = 0.080;
+        constexpr double audioRenderGuardSeconds = 0.120;
         const double audioReady = m_simulator->getSynthesizerOutputLatency();
         if (audioReady < audioRenderGuardSeconds) renderAllowed = false;
     }
