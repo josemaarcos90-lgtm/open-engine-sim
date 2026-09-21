@@ -1112,7 +1112,13 @@ void EngineSimApplication::loadEngine(Engine *engine, Vehicle *vehicle, Transmis
     // low RPM when a render frame varies in duration.
     m_simulator->setTargetSynthesizerLatency(0.1);
     m_simulator->setSynthesizerLatencyCorrectionEnabled(false);
+    #if defined(__ANDROID__)
+    // Preserve enough simulation history for the audio worker to recover from
+    // short scheduler/render spikes instead of deleting useful input.
+    m_simulator->setMaximumSynthesizerInputLatency(0.20);
+#else
     m_simulator->setMaximumSynthesizerInputLatency(0.03);
+#endif
 #if defined(__ANDROID__)
     checkpointAndroidMr("LOAD ENGINE 6/10 | simulacao configurada; carregando impulse responses");
 #endif
