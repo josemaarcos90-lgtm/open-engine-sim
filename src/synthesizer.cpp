@@ -33,6 +33,7 @@ Synthesizer::Synthesizer() {
     m_dspJumpPeak = 0;
     m_dspPreviousSample = 0;
     m_dspHasPreviousSample = false;
+    m_androidOutputGain = 1.0f;
 
     m_inputSampleRate = 0.0;
     m_audioSampleRate = 0.0;
@@ -197,7 +198,17 @@ bool Synthesizer::pumpAudioRendering() {
     std::lock_guard<std::mutex> renderLock(m_renderLock);
     // These parameters are constant for the whole rendered block. Updating the
     // leveler once here avoids three stores for every 44.1 kHz output sample.
+#if defined(__ANDROID__)
+    // The leveler works before the user volume multiplier. At 200% volume the
+    // old 30000 target could therefore demand ~60000 from a 16-bit output and
+    // clip every strong exhaust pulse. Reserve 5% headroom after volume.
+    const float safeVolume = std::max(0.001f, std::abs(parameters.volume));
+    m_levelingFilter.p_target = std::min(
+        parameters.levelerTarget,
+        (0.95f * static_cast<float>(INT16_MAX)) / safeVolume);
+#else
     m_levelingFilter.p_target = parameters.levelerTarget;
+#endif
     m_levelingFilter.p_maxLevel = parameters.levelerMaxGain;
     m_levelingFilter.p_minLevel = parameters.levelerMinGain;
     for (int i = 0; i < m_inputChannelCount; ++i) {
@@ -394,7 +405,17 @@ void Synthesizer::renderAudio() {
     std::lock_guard<std::mutex> renderLock(m_renderLock);
     // These parameters are constant for the whole rendered block. Updating the
     // leveler once here avoids three stores for every 44.1 kHz output sample.
+#if defined(__ANDROID__)
+    // The leveler works before the user volume multiplier. At 200% volume the
+    // old 30000 target could therefore demand ~60000 from a 16-bit output and
+    // clip every strong exhaust pulse. Reserve 5% headroom after volume.
+    const float safeVolume = std::max(0.001f, std::abs(parameters.volume));
+    m_levelingFilter.p_target = std::min(
+        parameters.levelerTarget,
+        (0.95f * static_cast<float>(INT16_MAX)) / safeVolume);
+#else
     m_levelingFilter.p_target = parameters.levelerTarget;
+#endif
     m_levelingFilter.p_maxLevel = parameters.levelerMaxGain;
     m_levelingFilter.p_minLevel = parameters.levelerMinGain;
     for (int i = 0; i < m_inputChannelCount; ++i) {
@@ -505,7 +526,26 @@ int16_t Synthesizer::renderAudio(int inputSample, const AudioParameters &paramet
 
     signal = m_antialiasing.fast_f(signal);
 
-    const float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
+    float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
+#if defined(__ANDROID__)
+    // Last-stage peak guard. Unlike Alpha48's soft-knee experiment, this is a
+    // gain controller: it attacks only when a sample would exceed the digital
+    // ceiling and releases slowly, so it cannot create a flat-topped waveform.
+    constexpr float pcmCeiling = 0.95f * static_cast<float>(INT16_MAX);
+    if (!std::isfinite(v_leveled)) v_leveled = 0.0f;
+    const float magnitude = std::abs(v_leveled);
+    const float requiredGain = magnitude > pcmCeiling ? pcmCeiling / magnitude : 1.0f;
+    if (requiredGain < m_androidOutputGain) {
+        m_androidOutputGain = requiredGain;
+    }
+    else {
+        // ~80 ms release: inaudible on individual combustion pulses and avoids
+        // pumping between consecutive cylinders.
+        m_androidOutputGain += (1.0f - m_androidOutputGain)
+            * (1.0f - std::exp(-1.0f / (0.080f * m_audioSampleRate)));
+    }
+    v_leveled *= m_androidOutputGain;
+#endif
     int r_int = std::lround(v_leveled);
     if (r_int > INT16_MAX) r_int = INT16_MAX;
     else if (r_int < INT16_MIN) r_int = INT16_MIN;
