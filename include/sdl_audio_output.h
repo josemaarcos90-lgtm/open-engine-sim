@@ -40,6 +40,7 @@ private:
     std::uint64_t m_worstCallbackGap = 0;
     std::uint64_t m_worstFillTime = 0;
     std::uint64_t m_worstPutTime = 0;
+    int m_androidTargetQueuedBytes = 0;
 };
 
 #endif
