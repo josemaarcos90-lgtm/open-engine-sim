@@ -37,7 +37,8 @@ bool SdlAudioOutput::start(Simulator *simulator) {
     m_worstCallbackGap = 0;
     m_worstFillTime = 0;
     m_worstPutTime = 0;
-    m_androidTargetQueuedBytes = 0;
+    m_sourceBytesPerFrame = static_cast<int>(sizeof(std::int16_t));
+    m_deviceFrequency = 0;
     if (m_diagnostics) {
         SDL_AudioSpec source = {}, destination = {};
         if (SDL_GetAudioStreamFormat(m_stream, &source, &destination)) {
@@ -46,11 +47,15 @@ bool SdlAudioOutput::start(Simulator *simulator) {
         }
     }
 #if defined(__ANDROID__)
-    // Pre-roll the SDL/device-side queue before playback starts. Our internal
-    // synth reservoir can be healthy while Android delays the next callback;
-    // queued PCM here is what actually bridges that scheduler gap.
-    m_androidTargetQueuedBytes = (spec.freq * static_cast<int>(sizeof(std::int16_t)) * 120) / 1000;
-    fillStream(m_stream, m_androidTargetQueuedBytes);
+    // SDL's stream callback reports demand in bytes in the stream's SOURCE
+    // format. Let SDL own resampling to the device's actual format/rate instead
+    // of trying to infer a hardware queue from SDL_GetAudioStreamQueued().
+    SDL_AudioSpec source = {}, destination = {};
+    if (SDL_GetAudioStreamFormat(m_stream, &source, &destination)) {
+        m_sourceBytesPerFrame = std::max(1,
+            static_cast<int>(SDL_AUDIO_BYTESIZE(source.format)) * source.channels);
+        m_deviceFrequency = destination.freq;
+    }
 #endif
     if (!SDL_ResumeAudioStreamDevice(m_stream)) {
         stop();
@@ -97,18 +102,17 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     // SDL can request a very small refill exactly when the convolution worker
     // is briefly late. Feed at least one Android block so the device stream
     // has useful headroom instead of repeatedly running on the edge.
+    // additionalAmount is SDL's current source-side demand. Supplying exactly
+    // that amount avoids the Alpha52 mistake of treating the stream input queue
+    // as if it were the Android hardware queue. Keep only a modest one-block
+    // cushion for callback jitter.
 #if defined(__ANDROID__)
-    const int queuedBytes = SDL_GetAudioStreamQueued(m_stream);
-    const int queueDeficit = std::max(0, m_androidTargetQueuedBytes - queuedBytes);
-    int remainingBytes = std::max(
-        std::max(requestedBytes, chunkFrames * bytesPerFrame),
-        queueDeficit);
+    const int remainingRequested = std::max(
+        requestedBytes, chunkFrames * bytesPerFrame);
+    int remainingBytes = std::min(
+        remainingRequested, requestedBytes + chunkFrames * bytesPerFrame);
 #else
     int remainingBytes = requestedBytes;
-#endif
-#if defined(__ANDROID__)
-    remainingBytes = std::min(remainingBytes,
-        m_androidTargetQueuedBytes + chunkFrames * bytesPerFrame);
 #endif
     while (remainingBytes > 0) {
         const int frames = std::min(chunkFrames,
@@ -239,12 +243,13 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
         const std::uint64_t now = SDL_GetTicks();
         if (now - m_lastDiagnosticTick >= 1000) {
             std::fprintf(stderr,
-                "audio-demand: pcm=%llu silence=%llu input=%.3fs output=%.3fs requested=%dB\n",
+                "audio-demand: pcm=%llu silence=%llu input=%.3fs output=%.3fs requested=%dB device=%dHz\n",
                 static_cast<unsigned long long>(m_pcmFrames),
                 static_cast<unsigned long long>(m_silenceFrames),
                 m_simulator->getSynthesizerInputLatency(),
                 m_simulator->getSynthesizerOutputLatency(),
-                requestedBytes);
+                requestedBytes,
+                m_deviceFrequency);
             m_pcmFrames = 0;
             m_silenceFrames = 0;
             m_lastDiagnosticTick = now;
