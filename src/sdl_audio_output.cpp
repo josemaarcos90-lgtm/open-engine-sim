@@ -58,14 +58,21 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     if (stream == nullptr || m_simulator == nullptr || requestedBytes <= 0) return;
 
 #if defined(__ANDROID__)
-    constexpr int chunkFrames = 1024;
+    constexpr int chunkFrames = 2048;
 #else
     constexpr int chunkFrames = 512;
 #endif
     constexpr int bytesPerFrame = static_cast<int>(sizeof(std::int16_t));
     std::array<std::int16_t, chunkFrames> samples{};
 
+    // SDL can request a very small refill exactly when the convolution worker
+    // is briefly late. Feed at least one Android block so the device stream
+    // has useful headroom instead of repeatedly running on the edge.
+#if defined(__ANDROID__)
+    int remainingBytes = std::max(requestedBytes, chunkFrames * bytesPerFrame);
+#else
     int remainingBytes = requestedBytes;
+#endif
     while (remainingBytes > 0) {
         const int frames = std::min(chunkFrames,
             (remainingBytes + bytesPerFrame - 1) / bytesPerFrame);
