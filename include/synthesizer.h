@@ -81,6 +81,7 @@ class Synthesizer {
         void destroy();
 
         int readAudioOutput(int samples, int16_t *buffer);
+        int consumeDspJumpPeak() { return m_dspJumpPeak.exchange(0, std::memory_order_acq_rel); }
 
         void writeInput(const double *data);
         void endInputBlock();
@@ -123,7 +124,9 @@ class Synthesizer {
         RingBuffer<int16_t> m_audioBuffer;
         int m_audioBufferSize;
         int16_t *m_renderScratch = nullptr;
-        float m_outputLimiterEnvelope = 1.0f;
+        std::atomic<int> m_dspJumpPeak{0};
+        int16_t m_dspPreviousSample = 0;
+        bool m_dspHasPreviousSample = false;
 
         float m_inputSampleRate;
         float m_audioSampleRate;
