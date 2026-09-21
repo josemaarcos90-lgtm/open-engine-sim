@@ -33,6 +33,9 @@ private:
     std::uint64_t m_pcmFrames = 0;
     std::uint64_t m_silenceFrames = 0;
     int m_peakQueuedBytes = 0;
+    std::atomic<std::uint64_t> m_underrunEvents = 0;
+    std::atomic<std::uint64_t> m_clipEvents = 0;
+    std::uint64_t m_lastVisualDiagnosticTick = 0;
 };
 
 #endif
