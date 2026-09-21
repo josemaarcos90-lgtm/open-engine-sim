@@ -29,6 +29,7 @@ Synthesizer::Synthesizer() {
     m_inputSamplesRead = 0;
 
     m_audioBufferSize = 0;
+    m_renderScratch = nullptr;
 
     m_inputSampleRate = 0.0;
     m_audioSampleRate = 0.0;
@@ -78,6 +79,7 @@ void Synthesizer::initialize(const Parameters &p) {
     m_audioBufferedSamples = 0;
 
     m_audioBuffer.initialize(p.audioBufferSize);
+    m_renderScratch = new int16_t[p.audioBufferSize];
     m_inputChannels = new InputChannel[p.inputChannelCount];
     for (int i = 0; i < p.inputChannelCount; ++i) {
         m_inputChannels[i].transferBuffer = new float[p.inputBufferSize];
@@ -220,6 +222,8 @@ void Synthesizer::discardAudioOutput() {
 
 void Synthesizer::destroy() {
     m_audioBuffer.destroy();
+    delete[] m_renderScratch;
+    m_renderScratch = nullptr;
 
     for (int i = 0; i < m_inputChannelCount; ++i) {
         m_inputChannels[i].data.destroy();
@@ -396,11 +400,16 @@ void Synthesizer::renderAudio() {
         m_filters[i].jitterFilter.setJitterScale(parameters.inputSampleNoise);
     }
 
+    // Convolution is the expensive part. Never hold the output mutex while
+    // doing it: the SDL device callback needs that mutex to consume ready PCM.
+    // Render into preallocated scratch first, then publish the completed block
+    // to the ring buffer in one short critical section.
+    for (int i = 0; i < n; ++i) {
+        m_renderScratch[i] = renderAudio(i, parameters);
+    }
     {
         std::lock_guard<std::mutex> outputLock(m_lock0);
-        for (int i = 0; i < n; ++i) {
-            m_audioBuffer.write(renderAudio(i, parameters));
-        }
+        for (int i = 0; i < n; ++i) m_audioBuffer.write(m_renderScratch[i]);
         m_audioBufferedSamples = static_cast<int>(m_audioBuffer.size());
     }
 
