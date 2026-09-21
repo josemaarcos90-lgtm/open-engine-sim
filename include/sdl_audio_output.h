@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 
 class SdlAudioOutput final : public AudioOutput {
 public:
@@ -22,9 +21,6 @@ private:
     static void SDLCALL audioCallback(
         void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
     void fillStream(SDL_AudioStream *stream, int requestedBytes);
-#if defined(__ANDROID__)
-    void androidAudioPump();
-#endif
     void stopLocked();
 
     SDL_AudioStream *m_stream = nullptr;
@@ -46,9 +42,6 @@ private:
     std::uint64_t m_worstPutTime = 0;
     int m_sourceBytesPerFrame = static_cast<int>(sizeof(std::int16_t));
     int m_deviceFrequency = 0;
-#if defined(__ANDROID__)
-    std::thread *m_androidPumpThread = nullptr;
-#endif
 };
 
 #endif
