@@ -338,7 +338,20 @@ bool EngineSimApplication::tick() {
     // Rendering is substantially more expensive than the audio-producing
     // simulation on the SDL path. Reserve CPU slices for simulation so
     // the audio stream is never starved by presentation work.
-    if (now - m_lastRenderTick >= renderIntervalMs) {
+    bool renderAllowed = true;
+#if defined(__ANDROID__)
+    // Audio-first scheduler: rendering is the largest burst of work on mobile.
+    // If the convolution worker's ready-to-play reservoir is getting low,
+    // postpone this presentation only. The next tight loop iteration continues
+    // physics/input production immediately, allowing audio to recover without
+    // changing simulation frequency or sound quality.
+    if (m_simulator != nullptr) {
+        constexpr double audioRenderGuardSeconds = 0.080;
+        const double audioReady = m_simulator->getSynthesizerOutputLatency();
+        if (audioReady < audioRenderGuardSeconds) renderAllowed = false;
+    }
+#endif
+    if (renderAllowed && now - m_lastRenderTick >= renderIntervalMs) {
 #if defined(__ANDROID__)
         const std::uint64_t renderStart = m_platform->ticks();
 #endif
