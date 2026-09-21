@@ -122,6 +122,7 @@ class Synthesizer {
 
         RingBuffer<int16_t> m_audioBuffer;
         int m_audioBufferSize;
+        int16_t *m_renderScratch = nullptr;
 
         float m_inputSampleRate;
         float m_audioSampleRate;
