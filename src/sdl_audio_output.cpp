@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
+#if defined(__ANDROID__)
+#include <jni.h>
+#endif
 
 bool SdlAudioOutput::start(Simulator *simulator) {
     std::lock_guard<std::mutex> lock(m_lifecycleMutex);
@@ -26,6 +30,9 @@ bool SdlAudioOutput::start(Simulator *simulator) {
     m_pcmFrames = 0;
     m_silenceFrames = 0;
     m_peakQueuedBytes = 0;
+    m_underrunEvents.store(0);
+    m_clipEvents.store(0);
+    m_lastVisualDiagnosticTick = 0;
     if (m_diagnostics) {
         SDL_AudioSpec source = {}, destination = {};
         if (SDL_GetAudioStreamFormat(m_stream, &source, &destination)) {
@@ -80,6 +87,47 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
         const int validFrames = std::max(0, pcmFrames);
         m_pcmFrames += validFrames;
         m_silenceFrames += frames - validFrames;
+
+        bool clipped = false;
+        int peak = 0;
+        for (int i = 0; i < validFrames; ++i) {
+            const int magnitude = std::abs(static_cast<int>(samples[i]));
+            peak = std::max(peak, magnitude);
+            if (magnitude >= 32760) clipped = true;
+        }
+        const bool underrun = validFrames < frames;
+        if (underrun) m_underrunEvents.fetch_add(1, std::memory_order_relaxed);
+        if (clipped) m_clipEvents.fetch_add(1, std::memory_order_relaxed);
+
+#if defined(__ANDROID__)
+        if (underrun || clipped) {
+            const std::uint64_t now = SDL_GetTicks();
+            if (now - m_lastVisualDiagnosticTick >= 180) {
+                m_lastVisualDiagnosticTick = now;
+                JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+                jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+                if (env != nullptr && activity != nullptr) {
+                    jclass cls = env->GetObjectClass(activity);
+                    if (cls != nullptr) {
+                        jmethodID method = env->GetMethodID(cls, "showAudioGlitch", "(Ljava/lang/String;)V");
+                        if (method != nullptr) {
+                            char diagnostic[160];
+                            std::snprintf(diagnostic, sizeof(diagnostic),
+                                "%s%s  PCM %d/%d  PEAK %d",
+                                underrun ? "UNDERRUN" : "",
+                                (underrun && clipped) ? " + CLIP" : (clipped ? "CLIP" : ""),
+                                validFrames, frames, peak);
+                            jstring text = env->NewStringUTF(diagnostic);
+                            env->CallVoidMethod(activity, method, text);
+                            env->DeleteLocalRef(text);
+                        }
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        env->DeleteLocalRef(cls);
+                    }
+                }
+            }
+        }
+#endif
 
         const int bytes = frames * bytesPerFrame;
         if (!SDL_PutAudioStreamData(stream, samples.data(), bytes)) return;
