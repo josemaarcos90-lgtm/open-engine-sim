@@ -30,7 +30,9 @@ Synthesizer::Synthesizer() {
 
     m_audioBufferSize = 0;
     m_renderScratch = nullptr;
-    m_outputLimiterEnvelope = 1.0f;
+    m_dspJumpPeak = 0;
+    m_dspPreviousSample = 0;
+    m_dspHasPreviousSample = false;
 
     m_inputSampleRate = 0.0;
     m_audioSampleRate = 0.0;
@@ -503,42 +505,32 @@ int16_t Synthesizer::renderAudio(int inputSample, const AudioParameters &paramet
 
     signal = m_antialiasing.fast_f(signal);
 
-    float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
-    if (!std::isfinite(v_leveled)) v_leveled = 0.0f;
+    const float v_leveled = m_levelingFilter.f(signal) * parameters.volume;
+    int r_int = std::lround(v_leveled);
+    if (r_int > INT16_MAX) r_int = INT16_MAX;
+    else if (r_int < INT16_MIN) r_int = INT16_MIN;
 
 #if defined(__ANDROID__)
-    // Leave a little digital headroom and avoid the hard INT16 clamp heard as
-    // sharp ticks on mobile recordings. Attack immediately when a peak would
-    // exceed the ceiling, then release smoothly (~35 ms) so normal exhaust
-    // character and transients are preserved.
-    constexpr float outputCeiling = 0.92f * static_cast<float>(INT16_MAX);
-    const float magnitude = std::abs(v_leveled);
-    const float requiredGain = magnitude > outputCeiling
-        ? outputCeiling / magnitude : 1.0f;
-    if (requiredGain < m_outputLimiterEnvelope) {
-        m_outputLimiterEnvelope = requiredGain;
+    // Diagnostic only: detect an abnormally large one-sample discontinuity
+    // after synthesis/convolution, before SDL ever sees the PCM. Do not alter
+    // the sample; this build is meant to locate the source of the audible tick.
+    const int16_t currentSample = static_cast<int16_t>(r_int);
+    if (m_dspHasPreviousSample) {
+        const int jump = std::abs(static_cast<int>(currentSample)
+            - static_cast<int>(m_dspPreviousSample));
+        constexpr int dspJumpThreshold = 12000;
+        if (jump >= dspJumpThreshold) {
+            int previousPeak = m_dspJumpPeak.load(std::memory_order_relaxed);
+            while (jump > previousPeak
+                && !m_dspJumpPeak.compare_exchange_weak(
+                    previousPeak, jump,
+                    std::memory_order_release, std::memory_order_relaxed)) {}
+        }
     }
-    else {
-        const float releaseCoeff = 1.0f - std::exp(-1.0f / (0.035f * m_audioSampleRate));
-        m_outputLimiterEnvelope +=
-            (1.0f - m_outputLimiterEnvelope) * releaseCoeff;
-    }
-    v_leveled *= m_outputLimiterEnvelope;
-
-    // A final soft knee catches isolated single-sample overs without ever
-    // producing a flat-topped INT16 waveform.
-    const float normalized = v_leveled / outputCeiling;
-    if (std::abs(normalized) > 0.96f) {
-        constexpr float kneeStart = 0.96f;
-        const float sign = normalized < 0.0f ? -1.0f : 1.0f;
-        const float excess = std::abs(normalized) - kneeStart;
-        v_leveled = sign * outputCeiling *
-            (kneeStart + (1.0f - kneeStart) * std::tanh(excess / (1.0f - kneeStart)));
-    }
+    m_dspPreviousSample = currentSample;
+    m_dspHasPreviousSample = true;
 #endif
 
-    int r_int = std::lround(v_leveled);
-    r_int = std::clamp(r_int, static_cast<int>(INT16_MIN), static_cast<int>(INT16_MAX));
     return static_cast<int16_t>(r_int);
 }
 
