@@ -11,8 +11,8 @@ android {
         applicationId 'org.openenginesim.app'
         minSdk 26
         targetSdk 35
-        versionCode 41
-        versionName '0.2.2-android-alpha44-audio-stability'
+        versionCode 42
+        versionName '0.2.2-android-alpha45-audio-glitch-detector'
 
         ndk {
             abiFilters 'arm64-v8a'
