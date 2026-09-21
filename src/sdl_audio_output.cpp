@@ -19,8 +19,15 @@ bool SdlAudioOutput::start(Simulator *simulator) {
     // clock domain; SDL handles only the final conversion to the device rate.
     const SDL_AudioSpec spec = { SDL_AUDIO_S16, 1, 44100 };
     m_simulator = simulator;
+#if defined(__ANDROID__)
+    // Push mode on Android: do not depend on the platform get-callback cadence.
+    // A dedicated producer keeps SDL's source-side queue filled continuously.
+    m_stream = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+#else
     m_stream = SDL_OpenAudioDeviceStream(
         SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SdlAudioOutput::audioCallback, this);
+#endif
     if (m_stream == nullptr) {
         m_simulator = nullptr;
         return false;
@@ -57,11 +64,16 @@ bool SdlAudioOutput::start(Simulator *simulator) {
         m_deviceFrequency = destination.freq;
     }
 #endif
+    m_running.store(true, std::memory_order_release);
+#if defined(__ANDROID__)
+    // Prime ~120 ms before starting the device, then keep 100-140 ms queued.
+    fillStream(m_stream, (44100 * static_cast<int>(sizeof(std::int16_t)) * 120) / 1000);
+    m_androidPumpThread = new std::thread(&SdlAudioOutput::androidAudioPump, this);
+#endif
     if (!SDL_ResumeAudioStreamDevice(m_stream)) {
-        stop();
+        stopLocked();
         return false;
     }
-    m_running = true;
     return true;
 }
 
@@ -107,10 +119,7 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     // as if it were the Android hardware queue. Keep only a modest one-block
     // cushion for callback jitter.
 #if defined(__ANDROID__)
-    const int remainingRequested = std::max(
-        requestedBytes, chunkFrames * bytesPerFrame);
-    int remainingBytes = std::min(
-        remainingRequested, requestedBytes + chunkFrames * bytesPerFrame);
+    int remainingBytes = requestedBytes;
 #else
     int remainingBytes = requestedBytes;
 #endif
@@ -257,6 +266,31 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     }
 }
 
+#if defined(__ANDROID__)
+void SdlAudioOutput::androidAudioPump() {
+    constexpr int sourceRate = 44100;
+    constexpr int bytesPerFrame = static_cast<int>(sizeof(std::int16_t));
+    constexpr int targetMs = 120;
+    constexpr int lowWaterMs = 90;
+    const int targetBytes = (sourceRate * bytesPerFrame * targetMs) / 1000;
+    const int lowWaterBytes = (sourceRate * bytesPerFrame * lowWaterMs) / 1000;
+
+    while (m_running.load(std::memory_order_acquire)) {
+        SDL_AudioStream *stream = m_stream;
+        if (stream == nullptr || m_simulator == nullptr) break;
+
+        const int queued = SDL_GetAudioStreamQueued(stream);
+        if (queued < lowWaterBytes) {
+            const int deficit = std::max(0, targetBytes - queued);
+            if (deficit > 0) fillStream(stream, deficit);
+        }
+        // 2 ms polling is cheap compared with convolution and removes the
+        // 35-50 ms callback scheduling gaps observed on this Android device.
+        SDL_Delay(2);
+    }
+}
+#endif
+
 bool SdlAudioOutput::loadImpulseResponse(Synthesizer &synthesizer, const std::string &path, float volume, int index) {
     return loadSdlImpulseResponse(synthesizer, path, volume, index);
 }
@@ -272,6 +306,13 @@ void SdlAudioOutput::stopLocked() {
     // old Simulator can be destroyed by EngineSimApplication.
     m_running.store(false, std::memory_order_release);
     SDL_AudioStream *oldStream = m_stream;
+#if defined(__ANDROID__)
+    if (m_androidPumpThread != nullptr) {
+        m_androidPumpThread->join();
+        delete m_androidPumpThread;
+        m_androidPumpThread = nullptr;
+    }
+#endif
     m_stream = nullptr;
     if (oldStream != nullptr) {
         SDL_SetAudioStreamGetCallback(oldStream, nullptr, nullptr);
