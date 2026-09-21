@@ -167,7 +167,7 @@ bool Synthesizer::pumpAudioRendering() {
 
     #if defined(__ANDROID__)
     // Give the convolution worker enough PCM headroom to survive CPU spikes.
-    constexpr int outputLeadSamples = 4096;
+    constexpr int outputLeadSamples = 8192;
 #else
     constexpr int outputLeadSamples = 1024;
 #endif
@@ -353,7 +353,7 @@ void Synthesizer::renderAudio() {
     // queue without adding a perceptible control-to-sound delay.
     #if defined(__ANDROID__)
     // Give the convolution worker enough PCM headroom to survive CPU spikes.
-    constexpr int outputLeadSamples = 4096;
+    constexpr int outputLeadSamples = 8192;
 #else
     constexpr int outputLeadSamples = 1024;
 #endif
