@@ -98,8 +98,7 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
     // is briefly late. Feed at least one Android block so the device stream
     // has useful headroom instead of repeatedly running on the edge.
 #if defined(__ANDROID__)
-    int queuedBytes = 0;
-    SDL_GetAudioStreamQueued(m_stream, &queuedBytes);
+    const int queuedBytes = SDL_GetAudioStreamQueued(m_stream);
     const int queueDeficit = std::max(0, m_androidTargetQueuedBytes - queuedBytes);
     int remainingBytes = std::max(
         std::max(requestedBytes, chunkFrames * bytesPerFrame),
