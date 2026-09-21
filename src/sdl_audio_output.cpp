@@ -96,11 +96,17 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
             if (magnitude >= 32760) clipped = true;
         }
         const bool underrun = validFrames < frames;
+#if defined(__ANDROID__)
+        const int dspJump = m_simulator->synthesizer().consumeDspJumpPeak();
+#else
+        const int dspJump = 0;
+#endif
+        const bool dspDiscontinuity = dspJump > 0;
         if (underrun) m_underrunEvents.fetch_add(1, std::memory_order_relaxed);
         if (clipped) m_clipEvents.fetch_add(1, std::memory_order_relaxed);
 
 #if defined(__ANDROID__)
-        if (underrun || clipped) {
+        if (underrun || clipped || dspDiscontinuity) {
             const std::uint64_t now = SDL_GetTicks();
             if (now - m_lastVisualDiagnosticTick >= 180) {
                 m_lastVisualDiagnosticTick = now;
@@ -112,11 +118,21 @@ void SdlAudioOutput::fillStream(SDL_AudioStream *stream, int requestedBytes) {
                         jmethodID method = env->GetMethodID(cls, "showAudioGlitch", "(Ljava/lang/String;)V");
                         if (method != nullptr) {
                             char diagnostic[160];
-                            std::snprintf(diagnostic, sizeof(diagnostic),
-                                "%s%s  PCM %d/%d  PEAK %d",
-                                underrun ? "UNDERRUN" : "",
-                                (underrun && clipped) ? " + CLIP" : (clipped ? "CLIP" : ""),
-                                validFrames, frames, peak);
+                            if (dspDiscontinuity) {
+                                std::snprintf(diagnostic, sizeof(diagnostic),
+                                    "DSP JUMP %d%s%s  PCM %d/%d  PEAK %d",
+                                    dspJump,
+                                    underrun ? " + UNDERRUN" : "",
+                                    clipped ? " + CLIP" : "",
+                                    validFrames, frames, peak);
+                            }
+                            else {
+                                std::snprintf(diagnostic, sizeof(diagnostic),
+                                    "%s%s  PCM %d/%d  PEAK %d",
+                                    underrun ? "UNDERRUN" : "",
+                                    (underrun && clipped) ? " + CLIP" : (clipped ? "CLIP" : ""),
+                                    validFrames, frames, peak);
+                            }
                             jstring text = env->NewStringUTF(diagnostic);
                             env->CallVoidMethod(activity, method, text);
                             env->DeleteLocalRef(text);
