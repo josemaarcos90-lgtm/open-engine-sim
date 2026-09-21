@@ -127,7 +127,7 @@ class Synthesizer {
         std::atomic<int> m_dspJumpPeak{0};
         int16_t m_dspPreviousSample = 0;
         bool m_dspHasPreviousSample = false;
-        float m_androidOutputGain = 1.0f;
+
 
         float m_inputSampleRate;
         float m_audioSampleRate;
